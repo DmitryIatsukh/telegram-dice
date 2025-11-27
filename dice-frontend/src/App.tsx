@@ -217,88 +217,6 @@ useEffect(() => {
   }, []);
 
 
-
-  // ---- apply game results to balance ----
-
-  useEffect(() => {
-    if (!currentUser) return
-
-    const newProcessed = new Set(processedResults)
-    let changed = false
-    let deltaTotal = 0
-    const newHistory: HistoryItem[] = []
-
-    lobbies.forEach(lobby => {
-      if (!lobby.gameResult) return
-
-      const key =
-        lobby.id +
-        ':' +
-        lobby.gameResult.winnerId +
-        ':' +
-        lobby.gameResult.highest +
-        ':' +
-        lobby.gameResult.players.map(p => p.id + ':' + p.roll).join(',')
-
-      if (newProcessed.has(key)) return
-
-      const bet = userBets[lobby.id] || 0
-      if (bet <= 0) {
-        newProcessed.add(key)
-        return
-      }
-
-      const participated = lobby.gameResult.players.some(p => p.id === currentUser.id)
-      if (!participated) {
-        newProcessed.add(key)
-        return
-      }
-
-      const isWinner = lobby.gameResult.winnerId === currentUser.id
-      const nPlayers = lobby.gameResult.players.length
-      let delta = 0
-
-      if (isWinner) delta = bet * (nPlayers - 1)
-      else delta = -bet
-
-      deltaTotal += delta
-      changed = true
-
-      const now = new Date()
-      const createdAt =
-        now.getFullYear() +
-        '-' +
-        String(now.getMonth() + 1).padStart(2, '0') +
-        '-' +
-        String(now.getDate()).padStart(2, '0') +
-        ' ' +
-        String(now.getHours()).padStart(2, '0') +
-        ':' +
-        String(now.getMinutes()).padStart(2, '0')
-
-      // For wins we store profit (bet * (nPlayers - 1)), for loses the lost bet
-      const winAmount = isWinner ? bet * (nPlayers - 1) : bet
-
-      newHistory.push({
-        id: Date.now() + Math.random(),
-        type: 'bet',
-        amount: winAmount,
-        currency: 'TON',
-        result: isWinner ? 'win' : 'lose',
-        createdAt,
-        playerName: currentUser.name
-      })
-
-      newProcessed.add(key)
-    })
-
-    if (changed) {
-      if (deltaTotal !== 0) setTonBalance(prev => prev + deltaTotal)
-      setHistory(prev => [...newHistory, ...prev].slice(0, 30))
-      setProcessedResults(newProcessed)
-    }
-  }, [lobbies, currentUser, userBets, processedResults])
-
   // ---- lobby actions ----
 
   const createLobby = () => {
@@ -427,7 +345,7 @@ const userBet = userBets[id] ?? 0
     )
 }
 
-  const startGame = (id: number) => {
+    const startGame = (id: number) => {
     if (!currentUser) return
     fetch(`${API}/lobbies/${id}/start`, {
       method: 'POST',
@@ -445,6 +363,11 @@ const userBet = userBets[id] ?? 0
       .then((lobby: Lobby | null) => {
         if (!lobby) return
         setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
+
+        // 🔄 refresh wallet (balance + history) after game
+        if (currentUser?.id) {
+          fetchWalletState(currentUser.id)
+        }
       })
   }
 
