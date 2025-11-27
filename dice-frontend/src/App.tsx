@@ -437,17 +437,11 @@ useEffect(() => {
       })
   }
 
-  const selectedLobby =
-    selectedLobbyId != null ? lobbies.find(l => l.id === selectedLobbyId) || null : null
+    const selectedLobby =
+    selectedLobbyId != null
+      ? lobbies.find(l => l.id === selectedLobbyId) || null
+      : null
 
-    joinLobby(
-      selectedLobby.id,
-      selectedLobby.isPrivate ? joinPin : undefined
-    )
-  }
-
-    toggleReady(selectedLobby.id)
-}
   const closePopup = () => {
     setSelectedLobbyId(null)
     setJoinPin('')
