@@ -54,5 +54,38 @@ router.post('/withdraw', (req, res) => {
   recordWithdraw(telegramId, username, amt);
   res.json({ ok: true, balance: wallet.balance, history: wallet.history });
 });
+router.post('/sync', (req, res) => {
+  const { telegramId, username, balance, history } = req.body;
+
+  if (!telegramId || typeof balance !== 'number') {
+    return res
+      .status(400)
+      .json({ error: 'telegramId and numeric balance are required' });
+  }
+
+  let wallet = wallets.get(telegramId);
+  if (!wallet) {
+    wallet = {
+      telegramId,
+      username: username || null,
+      balance: 0,
+      history: []
+    };
+  }
+
+  wallet.balance = balance;
+
+  if (Array.isArray(history)) {
+    wallet.history = history;
+  }
+
+  wallets.set(telegramId, wallet);
+
+  return res.json({
+    ok: true,
+    balance: wallet.balance,
+    history: wallet.history
+  });
+});
 
 module.exports = router;
