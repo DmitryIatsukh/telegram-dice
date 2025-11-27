@@ -204,19 +204,32 @@ router.post('/:id/start', (req, res) => {
     }
   }
 
-  const highest = winner.roll
+    const highest = winner.roll
+
+  // === money-related info ===
+  // if you already added lobby.betAmount in step 1.1, this will use it.
+  // if not yet, it will just default to 1.
+  const bet = lobby.betAmount || 1
+  const playersCount = readyPlayers.length
+  const totalPot = bet * playersCount
 
   lobby.status = 'finished'
   lobby.gameResult = {
     winnerId: winner.id,
     winnerName: winner.name,
     highest,
+    betAmount: bet,       // 👈 NEW
+    playersCount,         // 👈 NEW
+    totalPot,             // 👈 NEW
     players: readyPlayers.map(p => ({
       id: p.id,
       name: p.name,
       roll: p.roll
     }))
   }
+
+  res.json(viewLobby(lobby))
+})
 
   res.json(viewLobby(lobby))
 })
