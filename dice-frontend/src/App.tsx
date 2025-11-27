@@ -348,26 +348,49 @@ useEffect(() => {
 }
 
   const joinLobby = (id: number, pin?: string) => {
-    if (!currentUser) return
-    fetch(`${API}/lobbies/${id}/join`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: currentUser.id, name: currentUser.name, pin })
-    })
-      .then(async res => {
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}))
-          setErrorMessage(err.error || 'Cannot join lobby')
-          return null
-        }
-        return res.json()
-      })
-      .then((lobby: Lobby | null) => {
-        if (!lobby) return
-        setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
-        setJoinPin('')
-      })
+  if (!currentUser) return
+
+  // 🔎 find this lobby and its bet
+  const lobby = lobbies.find(l => l.id === id)
+  const lobbyBet = lobby?.betAmount ?? 0.1
+
+  // 💰 check balance vs bet
+  if (tonBalance < lobbyBet) {
+    setErrorMessage(
+      `You need at least ${lobbyBet.toFixed(2)} TON to join this lobby.`
+    )
+    return
   }
+
+  // Optional: auto-set your bet to the lobby's bet
+  setUserBets(prev => ({
+    ...prev,
+    [id]: lobbyBet
+  }))
+
+  fetch(`${API}/lobbies/${id}/join`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      userId: currentUser.id,
+      name: currentUser.name,
+      pin
+    })
+  })
+    .then(async res => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        setErrorMessage(err.error || 'Cannot join lobby')
+        return null
+      }
+      return res.json()
+    })
+    .then((lobby: Lobby | null) => {
+      if (!lobby) return
+      setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
+      setJoinPin('')
+    })
+}
 
   const toggleReady = (id: number) => {
   if (!currentUser) return
