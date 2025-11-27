@@ -1,125 +1,58 @@
-// dice-backend/src/routes/walletRoutes.js
-const express = require("express");
+const express = require('express');
 const router = express.Router();
 
-// Very simple in-memory store (good for dev; later you can swap to DB)
-const users = new Map(); // key: telegramId string -> { balance: number, username: string }
-const history = []; // array of { telegramId, type, amount, txHash, status, createdAt }
+const {
+  wallets,
+  getOrCreateWallet,
+  recordDeposit,
+  recordWithdraw,
+} = require('../walletStore');
 
-/**
- * Helper – get or create user record
- */
-function getOrCreateUser(telegramId, username) {
-  if (!users.has(telegramId)) {
-    users.set(telegramId, {
-      balance: 0,
-      username: username || "Player",
-    });
-  }
-  return users.get(telegramId);
-}
-
-/**
- * GET /api/wallet/state/:telegramId
- * Returns current balance + history for this user
- */
-router.get("/state/:telegramId", (req, res) => {
-  const { telegramId } = req.params;
-  const user = users.get(telegramId) || { balance: 0, username: "Player" };
-  const userHistory = history.filter((h) => h.telegramId === telegramId);
-  res.json({ balance: user.balance, username: user.username, history: userHistory });
+// GET /api/wallet/state/:telegramId
+router.get('/state/:telegramId', (req, res) => {
+  const telegramId = String(req.params.telegramId);
+  const wallet = wallets.get(telegramId) || { balance: 0, history: [] };
+  res.json({
+    balance: wallet.balance,
+    history: wallet.history,
+  });
 });
 
-/**
- * POST /api/wallet/deposit
- * Body: { telegramId, username, amount, txHash }
- * We trust TonConnect that tx was sent – no on-chain check (for now).
- */
-router.post("/deposit", (req, res) => {
-  try {
-    const { telegramId, username, amount, txHash } = req.body;
+// POST /api/wallet/deposit
+router.post('/deposit', (req, res) => {
+  const { telegramId, username, amount } = req.body;
+  const amt = Number(amount);
 
-    if (!telegramId || !amount) {
-      return res.status(400).json({ error: "telegramId and amount are required" });
-    }
-
-    const numericAmount = Number(amount);
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      return res.status(400).json({ error: "Invalid amount" });
-    }
-
-    const user = getOrCreateUser(String(telegramId), username);
-
-    user.balance += numericAmount;
-
-    const record = {
-      telegramId: String(telegramId),
-      type: "deposit",
-      amount: numericAmount,
-      txHash: txHash || null,
-      status: "confirmed",
-      createdAt: new Date().toISOString(),
-    };
-    history.push(record);
-
-    res.json({
-      ok: true,
-      balance: user.balance,
-      history: history.filter((h) => h.telegramId === String(telegramId)),
-    });
-  } catch (err) {
-    console.error("Deposit error:", err);
-    res.status(500).json({ error: "Internal server error" });
+  if (!telegramId || !Number.isFinite(amt) || amt <= 0) {
+    return res
+      .status(400)
+      .json({ error: 'telegramId and positive amount are required' });
   }
+
+  const wallet = recordDeposit(telegramId, username, amt);
+  res.json({ ok: true, balance: wallet.balance, history: wallet.history });
 });
 
-/**
- * POST /api/wallet/withdraw
- * Body: { telegramId, username, amount, walletAddress }
- * This ONLY updates internal balance + creates 'pending' request;
- * you will send TON manually from your wallet for now.
- */
-router.post("/withdraw", (req, res) => {
-  try {
-    const { telegramId, username, amount, walletAddress } = req.body;
+// POST /api/wallet/withdraw
+router.post('/withdraw', (req, res) => {
+  const { telegramId, username, amount } = req.body;
+  const amt = Number(amount);
 
-    if (!telegramId || !amount) {
-      return res.status(400).json({ error: "telegramId and amount are required" });
-    }
-
-    const numericAmount = Number(amount);
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      return res.status(400).json({ error: "Invalid amount" });
-    }
-
-    const user = getOrCreateUser(String(telegramId), username);
-
-    if (user.balance < numericAmount) {
-      return res.status(400).json({ error: "Insufficient balance" });
-    }
-
-    user.balance -= numericAmount;
-
-    const record = {
-      telegramId: String(telegramId),
-      type: "withdraw",
-      amount: numericAmount,
-      txHash: null,
-      toAddress: walletAddress || null,
-      status: "pending", // you can flip to 'sent' when you actually transfer
-      createdAt: new Date().toISOString(),
-    };
-    history.push(record);
-
-    res.json({
-      ok: true,
-      balance: user.balance,
-      history: history.filter((h) => h.telegramId === String(telegramId)),
-    });
-  } catch (err) {
-    console.error("Withdraw error:", err);
-    res.status(500).json({ error: "Internal server error" });
+  if (!telegramId || !Number.isFinite(amt) || amt <= 0) {
+    return res
+      .status(400)
+      .json({ ok: false, error: 'telegramId and positive amount are required' });
   }
+
+  const wallet = getOrCreateWallet(telegramId, username);
+  if (wallet.balance < amt) {
+    return res
+      .status(400)
+      .json({ ok: false, error: 'Not enough balance for withdraw' });
+  }
+
+  recordWithdraw(telegramId, username, amt);
+  res.json({ ok: true, balance: wallet.balance, history: wallet.history });
 });
 
 module.exports = router;
