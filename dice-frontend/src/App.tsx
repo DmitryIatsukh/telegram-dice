@@ -447,7 +447,7 @@ useEffect(() => {
   }
 
     toggleReady(selectedLobby.id)
-
+}
   const closePopup = () => {
     setSelectedLobbyId(null)
     setJoinPin('')
@@ -1698,4 +1698,5 @@ const shortAddress =
     </div>
   )
 }
+
 export default App
