@@ -87,8 +87,7 @@ const [newLobbyBet, setNewLobbyBet] = useState<number>(1)
 
     const [userBets, setUserBets] = useState<Record<number, number>>({})
   // to avoid applying the same game result multiple times
-  const [processedResults, setProcessedResults] = useState<Set<string>>(new Set());
-
+  const [processedResults, setProcessedResults] = useState<Set<number>>(new Set());
   const [currentPage, setCurrentPage] = useState<Page>('lobbies')
   const [depositAmount, setDepositAmount] = useState('')
   const [withdrawAmount, setWithdrawAmount] = useState('')
@@ -636,7 +635,7 @@ const handleWithdraw = async () => {
 
     setTonBalance(updatedBalance)
     setHistory(updatedHistory)
-    setProcessedResults(Array.from(already))
+    setProcessedResults(new Set(already));
 
     // 2) sync wallet to backend (so reload keeps same balance)
     ;(async () => {
