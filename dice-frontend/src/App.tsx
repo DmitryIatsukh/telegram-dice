@@ -79,6 +79,7 @@ function DiceApp() {
   const [createPin, setCreatePin] = useState('')
   const [joinPin, setJoinPin] = useState('')
 // --- bet amount when creating a new lobby ---
+
 const [newLobbyBet, setNewLobbyBet] = useState<number>(1)
   const [tonBalance, setTonBalance] = useState<number>(100.0)
   const [history, setHistory] = useState<HistoryItem[]>([])
