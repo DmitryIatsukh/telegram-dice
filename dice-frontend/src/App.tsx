@@ -439,29 +439,12 @@ useEffect(() => {
 
   const selectedLobby =
     selectedLobbyId != null ? lobbies.find(l => l.id === selectedLobbyId) || null : null
-  const handleJoinSelectedLobby = () => {
-    if (!currentUser || !selectedLobby) return
-
-    const bet = selectedLobby.betAmount || 0
-    if (bet > tonBalance) {
-      setErrorMessage("Not enough balance to join this lobby")
-      return
-    }
 
     joinLobby(
       selectedLobby.id,
       selectedLobby.isPrivate ? joinPin : undefined
     )
   }
-
-  const handleReadySelectedLobby = () => {
-    if (!currentUser || !selectedLobby) return
-
-    const bet = selectedLobby.betAmount || 0
-    if (bet > tonBalance) {
-      setErrorMessage("Not enough balance to ready up in this lobby")
-      return
-    }
 
     toggleReady(selectedLobby.id)
   }
