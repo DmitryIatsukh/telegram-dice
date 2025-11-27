@@ -447,7 +447,6 @@ useEffect(() => {
   }
 
     toggleReady(selectedLobby.id)
-  }
 
   const closePopup = () => {
     setSelectedLobbyId(null)
@@ -1699,5 +1698,4 @@ const shortAddress =
     </div>
   )
 }
-
 export default App
