@@ -851,7 +851,7 @@ const shortAddress =
     fontWeight: 700,
     cursor: isDepositing ? 'wait' : 'pointer',
     whiteSpace: 'nowrap',
-    opacity: isDepositing ? 0.6 : 1
+    opacity: isDepositing ? 0.6 : 1,
  minWidth: 90,
     textAlign: 'center',
   }}
@@ -902,7 +902,7 @@ const shortAddress =
     fontWeight: 700,
     cursor: isWithdrawing ? 'wait' : 'pointer',
     whiteSpace: 'nowrap',
-    opacity: isWithdrawing ? 0.6 : 1
+    opacity: isWithdrawing ? 0.6 : 1,
 minWidth: 90,
     textAlign: 'center',
   }}
