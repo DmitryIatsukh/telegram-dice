@@ -1599,68 +1599,78 @@ paddingBottom: 100,
     position: 'fixed',
     left: 0,
     right: 0,
-    bottom: 6,
-    padding: 8,
+    bottom: 0,
+    padding: '4px 0 calc(env(safe-area-inset-bottom, 0px) + 4px)',
     background:
       'linear-gradient(135deg, rgba(0,40,100,0.96), rgba(0,15,60,0.96))',
     borderTop: '1px solid rgba(0,140,255,0.35)',
     display: 'flex',
-    justifyContent: 'space-around',
-    gap: 8,
+    justifyContent: 'center',
     zIndex: 20
   }}
 >
-  <button
-  onClick={() => setCurrentPage('lobbies')}
-  style={{
-    flex: 1,
-    padding: '8px 0',
-    margin: '0 6px',
-    borderRadius: 30,
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: 14,
-    fontWeight: 600,
-    background:
-      currentPage === 'lobbies'
-        ? 'linear-gradient(135deg, #4bbaff 0%, #5bc9ff 50%, #84d8ff 100%)'
-        : 'transparent',
-    color: currentPage === 'lobbies' ? '#000' : '#fff',
-    textAlign: 'center',
-    boxShadow:
-      currentPage === 'lobbies'
-        ? '0 0 10px rgba(80,180,255,0.6)'
-        : 'none'
-  }}
->
-  Lobbies
-</button>
+  <div
+    style={{
+      width: '90%',
+      maxWidth: 420,
+      display: 'flex',
+      gap: 8,
+      padding: 4,
+      borderRadius: 999,
+    }}
+  >
+    <button
+      onClick={() => setCurrentPage('lobbies')}
+      style={{
+        flex: 1,
+        padding: '8px 0',
+        borderRadius: 999,
+        border: 'none',
+        cursor: 'pointer',
+        fontSize: 14,
+        fontWeight: 600,
+        background:
+          currentPage === 'lobbies'
+            ? 'linear-gradient(135deg, #4bbaff 0%, #5bc9ff 50%, #84d8ff 100%)'
+            : 'transparent',
+        color: currentPage === 'lobbies' ? '#000' : '#fff',
+        textAlign: 'center',
+        boxShadow:
+          currentPage === 'lobbies'
+            ? '0 0 10px rgba(80,180,255,0.6)'
+            : 'none',
+        whiteSpace: 'nowrap'
+      }}
+    >
+      Lobbies
+    </button>
 
-<button
-  onClick={() => setCurrentPage('profile')}
-  style={{
-    flex: 1,
-    padding: '8px 0',
-    margin: '0 6px',
-    borderRadius: 30,
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: 14,
-    fontWeight: 600,
-    background:
-      currentPage === 'profile'
-        ? 'linear-gradient(135deg, #4bbaff 0%, #5bc9ff 50%, #84d8ff 100%)'
-        : 'transparent',
-    color: currentPage === 'profile' ? '#000' : '#fff',
-    textAlign: 'center',
-    boxShadow:
-      currentPage === 'profile'
-        ? '0 0 10px rgba(80,180,255,0.6)'
-        : 'none'
-  }}
->
-  Profile
-</button>
+    <button
+      onClick={() => setCurrentPage('profile')}
+      style={{
+        flex: 1,
+        padding: '8px 0',
+        borderRadius: 999,
+        border: 'none',
+        cursor: 'pointer',
+        fontSize: 14,
+        fontWeight: 600,
+        background:
+          currentPage === 'profile'
+            ? 'linear-gradient(135deg, #4bbaff 0%, #5bc9ff 50%, #84d8ff 100%)'
+            : 'transparent',
+        color: currentPage === 'profile' ? '#000' : '#fff',
+        textAlign: 'center',
+        boxShadow:
+          currentPage === 'profile'
+            ? '0 0 10px rgba(80,180,255,0.6)'
+            : 'none',
+        whiteSpace: 'nowrap'
+      }}
+    >
+      Profile
+    </button>
+  </div>
 </div>
       {/* Error overlay */}
       {errorMessage && (
