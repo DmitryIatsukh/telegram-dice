@@ -33,6 +33,7 @@ type Lobby = {
   creatorId: string | null
   creatorName: string | null
   isPrivate: boolean
+  betAmount?: number      // 👈 NEW
   gameResult: GameResult
 }
 
@@ -77,7 +78,8 @@ function DiceApp() {
   const [createMode, setCreateMode] = useState<'public' | 'private'>('public')
   const [createPin, setCreatePin] = useState('')
   const [joinPin, setJoinPin] = useState('')
-
+// --- bet amount when creating a new lobby ---
+const [newLobbyBet, setNewLobbyBet] = useState<number>(1)
   const [tonBalance, setTonBalance] = useState<number>(100.0)
   const [history, setHistory] = useState<HistoryItem[]>([])
 
@@ -300,39 +302,40 @@ useEffect(() => {
   // ---- lobby actions ----
 
   const createLobby = () => {
-    if (!currentUser) return
+  if (!currentUser) return
 
-    if (createMode === 'private' && !/^\d{4}$/.test(createPin)) {
-      setErrorMessage('Private lobby needs a 4-digit PIN')
-      return
-    }
-
-    fetch(`${API}/lobbies/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: currentUser.id,
-        name: currentUser.name,
-        isPrivate: createMode === 'private',
-        pin: createMode === 'private' ? createPin : undefined
-      })
-    })
-      .then(async res => {
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}))
-          setErrorMessage(err.error || 'Error creating lobby')
-          return null
-        }
-        return res.json()
-      })
-      .then((lobby: Lobby | null) => {
-        if (!lobby) return
-        setLobbies(prev => [...prev, lobby])
-        setSelectedLobbyId(lobby.id)
-        setCreatePin('')
-        setCurrentPage('lobbies')
-      })
+  if (createMode === 'private' && !/^\d{4}$/.test(createPin)) {
+    setErrorMessage('Private lobby needs a 4-digit PIN')
+    return
   }
+
+  fetch(`${API}/lobbies/create`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      userId: currentUser.id,
+      name: currentUser.username || currentUser.name,
+      isPrivate: createMode === 'private',
+      pin: createMode === 'private' ? createPin : undefined,
+      betAmount: newLobbyBet,            // 👈 NEW
+    }),
+  })
+    .then(async (res) => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        setErrorMessage(err.error || 'Error creating lobby')
+        return null
+      }
+      return res.json()
+    })
+    .then((lobby: Lobby | null) => {
+      if (!lobby) return
+      setLobbies((prev) => [...prev, lobby])
+      setSelectedLobbyId(lobby.id)
+      setCreatePin('')
+      setCurrentPage('lobbies')
+    })
+}
 
   const joinLobby = (id: number, pin?: string) => {
     if (!currentUser) return
@@ -357,17 +360,52 @@ useEffect(() => {
   }
 
   const toggleReady = (id: number) => {
-    if (!currentUser) return
-    fetch(`${API}/lobbies/${id}/ready`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: currentUser.id })
-    })
-      .then(res => res.json())
-      .then((lobby: Lobby) =>
-        setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
+  if (!currentUser) return
+
+  // Find the lobby so we can see its bet
+  const lobby = lobbies.find(l => l.id === id)
+  if (!lobby) return
+
+  const bet = lobby.betAmount ?? 1
+
+  // Is the current user already in this lobby and ready?
+  const me = lobby.players.find(p => p.id === currentUser.id)
+  const isCurrentlyReady = me?.isReady ?? false
+
+  // If we are going from NOT ready -> READY, check balance first
+  if (!isCurrentlyReady) {
+    if (tonBalance < bet) {
+      setErrorMessage(
+        `Not enough balance. You need at least ${bet.toFixed(2)} TON to play in this lobby.`
       )
+      return
+    }
+
+    // Register this lobby bet for result calculation
+    setUserBets(prev => ({
+      ...prev,
+      [id]: bet
+    }))
+  } else {
+    // If we unready, remove the bet for this lobby
+    setUserBets(prev => {
+      const copy = { ...prev }
+      delete copy[id]
+      return copy
+    })
   }
+
+  // Call backend to toggle ready flag
+  fetch(`${API}/lobbies/${id}/ready`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId: currentUser.id })
+  })
+    .then(res => res.json())
+    .then((lobby: Lobby) =>
+      setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
+    )
+}
 
   const startGame = (id: number) => {
     if (!currentUser) return
@@ -1049,7 +1087,29 @@ const shortAddress =
             />
           </div>
         )}
-
+        {/* Bet amount for new lobby */}
+        <div style={{ marginBottom: 8 }}>
+          <span style={{ fontSize: 13 }}>Bet amount (TON): </span>
+          <input
+            type="number"
+            min={0.1}
+            step={0.1}
+            value={newLobbyBet}
+            onChange={e =>
+              setNewLobbyBet(
+                Math.max(0.1, Number(e.target.value) || 0)
+              )
+            }
+            style={{
+              padding: '4px 8px',
+              borderRadius: 6,
+              border: '1px solid #555',
+              background: '#050511',
+              color: '#fff',
+              width: 100
+            }}
+          />
+        </div>
         <button
           onClick={createLobby}
           style={{
@@ -1125,7 +1185,10 @@ const shortAddress =
           <p style={{ fontSize: 13, color: '#ccc' }}>
             Creator: {lobby.creatorName || 'not set yet (no players)'}
           </p>
-          <p style={{ fontSize: 13, color: '#ccc' }}>Players: {lobby.players.length}</p>
+                  <p style={{ fontSize: 13, color: '#ccc' }}>Players: {lobby.players.length}</p>
+          <p style={{ fontSize: 13, color: '#ccc' }}>
+            Bet: { (lobby.betAmount ?? 1).toFixed(2) } TON
+          </p>
           <button
             onClick={() => setSelectedLobbyId(lobby.id)}
             style={{
@@ -1374,18 +1437,23 @@ const shortAddress =
             </button>
           </div>
 
-          <p style={{ fontSize: 13, color: '#ccc' }}>Status: {selectedLobby.status}</p>
-          <p style={{ fontSize: 13, color: '#ccc' }}>
-            Creator: {selectedLobby.creatorName || 'not set'}
-          </p>
-          <p style={{ marginTop: 10, fontSize: 13 }}>
-            Players:{' '}
-            {selectedLobby.players.length === 0
-              ? 'none'
-              : selectedLobby.players
-                  .map(p => `${p.name} (${p.isReady ? 'ready' : 'not ready'})`)
-                  .join(', ')}
-          </p>
+         <p style={{ fontSize: 13, color: '#ccc' }}>
+  Status: {selectedLobby.status}
+</p>
+<p style={{ fontSize: 13, color: '#ccc' }}>
+  Creator: {selectedLobby.creatorName || 'not set'}
+</p>
+<p style={{ fontSize: 13, color: '#ccc' }}>
+  Bet: {(selectedLobby.betAmount ?? 1).toFixed(2)} TON
+</p>
+<p style={{ marginTop: 10, fontSize: 13 }}>
+  Players:{' '}
+  {selectedLobby.players.length === 0
+    ? 'none'
+    : selectedLobby.players
+        .map(p => `${p.name} (${p.isReady ? 'ready' : 'not ready'})`)
+        .join(', ')}
+</p>
 
           <div
             style={{
