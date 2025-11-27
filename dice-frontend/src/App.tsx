@@ -1242,7 +1242,7 @@ const shortAddress =
           'radial-gradient(circle at top, #0044cc 0%, #001b4d 40%, #000814 100%)',
         color: '#fff',
         padding: 16,
-paddingBottom: 80, 
+paddingBottom: 100, 
         position: 'relative'
       }}
     >
