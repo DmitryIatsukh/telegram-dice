@@ -393,7 +393,7 @@ useEffect(() => {
       }
       return res.json()
     })
-    .then((lobby: Lobby | null) => {.
+    .then((lobby: Lobby | null) => {
       if (!lobby) return
       setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
       setJoinPin('')
