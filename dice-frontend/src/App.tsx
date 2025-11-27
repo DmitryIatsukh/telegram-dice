@@ -317,7 +317,8 @@ useEffect(() => {
     setErrorMessage('Private lobby needs a 4-digit PIN')
     return
   }
-
+// Enforce minimum bet 0.1 TON logically (not in the input)
+  const betToSend = newLobbyBet >= 0.1 ? newLobbyBet : 0.1
   fetch(`${API}/lobbies/create`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -851,6 +852,8 @@ const shortAddress =
     cursor: isDepositing ? 'wait' : 'pointer',
     whiteSpace: 'nowrap',
     opacity: isDepositing ? 0.6 : 1
+ minWidth: 90,
+    textAlign: 'center',
   }}
 >
   {isDepositing ? 'Processing…' : '💸 Deposit'}
@@ -900,6 +903,8 @@ const shortAddress =
     cursor: isWithdrawing ? 'wait' : 'pointer',
     whiteSpace: 'nowrap',
     opacity: isWithdrawing ? 0.6 : 1
+minWidth: 90,
+    textAlign: 'center',
   }}
 >
   {isWithdrawing ? 'Processing…' : '📤 Withdraw'}
@@ -1101,25 +1106,29 @@ const shortAddress =
         {/* Bet amount for new lobby */}
         <div style={{ marginBottom: 8 }}>
           <span style={{ fontSize: 13 }}>Bet amount (TON): </span>
-          <input
-            type="number"
-            min={0.1}
-            step={0.1}
-            value={newLobbyBet}
-            onChange={e =>
-              setNewLobbyBet(
-                Math.max(0.1, Number(e.target.value) || 0)
-              )
-            }
-            style={{
-              padding: '4px 8px',
-              borderRadius: 6,
-              border: '1px solid #555',
-              background: '#050511',
-              color: '#fff',
-              width: 100
-            }}
-          />
+         <input
+  type="number"
+  step={0.1}
+  placeholder="0.1 eg"
+  value={newLobbyBet === 0 ? '' : newLobbyBet}
+  onChange={e => {
+    const v = e.target.value
+    if (v === '') {
+      // allow user to clear the field completely
+      setNewLobbyBet(0)
+    } else {
+      setNewLobbyBet(Number(v))
+    }
+  }}
+  style={{
+    padding: '4px 8px',
+    borderRadius: 6,
+    border: '1px solid #555',
+    background: '#050511',
+    color: '#fff',
+    width: 100
+  }}
+/>
         </div>
         <button
           onClick={createLobby}
