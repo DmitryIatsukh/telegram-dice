@@ -1538,7 +1538,7 @@ const shortAddress =
     Start Game
   </button>
 )}
-
+</div>
 
           {selectedLobby.gameResult && (
             <div style={{ marginTop: 14 }}>
