@@ -321,9 +321,14 @@ if (!lobby) {
 
 const userBet = userBets[id] ?? 0
 
-  // minimum bet 0.1 TON
-  if (userBet < 0.1) {
-    setErrorMessage('Set your bet (at least 0.1 TON) before getting ready.')
+  // minimum bet: lobby base bet (if exists) OR 0.1
+  const minBet =
+    lobby.betAmount != null && lobby.betAmount > 0 ? lobby.betAmount : 0.1
+
+  if (userBet < minBet) {
+    setErrorMessage(
+      `Set your bet (at least ${minBet.toFixed(2)} TON) before readying up`
+    )
     return
   }
 
@@ -1143,6 +1148,10 @@ const shortAddress =
           </p>
                   <p style={{ fontSize: 13, color: '#ccc' }}>Players: {lobby.players.length}</p>
 <p style={{ fontSize: 13, color: '#ccc' }}>
+  Base bet:{' '}
+  {lobby.betAmount != null ? `${lobby.betAmount.toFixed(2)} TON` : '—'}
+</p>
+<p style={{ fontSize: 13, color: '#ccc' }}>
   Bet per player:{' '}
   {typeof lobby.betAmount === 'number'
     ? `${lobby.betAmount.toFixed(2)} TON`
@@ -1399,10 +1408,12 @@ paddingBottom: 100,
               <input
                 type="text"
                 value={
-                  userBets[selectedLobby.id] !== undefined
-                    ? userBets[selectedLobby.id].toString()
-                    : ''
-                }
+  userBets[selectedLobby.id] !== undefined
+    ? userBets[selectedLobby.id].toString()
+    : selectedLobby.betAmount != null
+    ? selectedLobby.betAmount.toString()
+    : ''
+}
                 onChange={e => {
                   const raw = e.target.value.replace(/[^0-9.]/g, '')
                   const parsed = parseFloat(raw)
