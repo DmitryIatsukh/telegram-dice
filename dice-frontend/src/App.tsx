@@ -93,7 +93,6 @@ const [newLobbyBet, setNewLobbyBet] = useState<number>(1)
   const [depositAmount, setDepositAmount] = useState('')
   const [withdrawAmount, setWithdrawAmount] = useState('')
 // for bet settlement (which lobbies we already applied balance for)
-const [processedBetLobbies, setProcessedBetLobbies] = useState<number[]>([]);
 
   const [tonConnectUI] = useTonConnectUI()
   const wallet = useTonWallet()
@@ -582,20 +581,11 @@ const handleWithdraw = async () => {
   }
 };
 
-  // ---- apply finished game results to balance + history and sync wallet ----
+    // ---- sync wallet to backend whenever balance or history change ----
   useEffect(() => {
-    if (!currentUser) return
+    if (!currentUser) return;
 
-    // use a Set internally, but store array in state for React
-    const already = new Set<number>(processedResults)
-    let changed = false
-    let deltaTotal = 0
-    const newHistoryItems: HistoryItem[] = []
-
-    lobbies.forEach(lobby => {
-
-    // 2) sync wallet to backend (so reload keeps same balance)
-    ;(async () => {
+    (async () => {
       try {
         await fetch(`${API_BASE}/api/wallet/sync`, {
           method: 'POST',
@@ -603,15 +593,16 @@ const handleWithdraw = async () => {
           body: JSON.stringify({
             telegramId: currentUser.id,
             username: currentUser.username || currentUser.name,
-            balance: updatedBalance,
-            history: updatedHistory
-          })
-        })
+            balance: tonBalance,
+            history,
+          }),
+        });
       } catch (e) {
-        console.log('wallet sync error', e)
+        console.log('wallet sync error', e);
       }
-    })()
-  }, [lobbies, currentUser, userBets, processedResults, tonBalance, history])
+    })();
+  }, [currentUser, tonBalance, history]);
+
 
   // ---- derived: last win & biggest win ----
 
