@@ -393,45 +393,70 @@ useEffect(() => {
     })
 }
 
-  const toggleReady = (id: number) => {
-  if (!currentUser) return
+  const toggleReady = async (id: number) => {
+  if (!currentUser) return;
 
-  // get this lobby + user’s bet for it
-const lobby = lobbies.find(l => l.id === id)
-if (!lobby) {
-  setErrorMessage('Lobby not found')
-  return
-}
+  const lobby = lobbies.find(l => l.id === id);
+  if (!lobby) {
+    setErrorMessage('Lobby not found');
+    return;
+  }
 
-const userBet = userBets[id] ?? 0
+  const userBet = userBets[id] ?? 0;
 
   // minimum bet: lobby base bet (if exists) OR 0.1
   const minBet =
-    lobby.betAmount != null && lobby.betAmount > 0 ? lobby.betAmount : 0.1
+    lobby.betAmount != null && lobby.betAmount > 0 ? lobby.betAmount : 0.1;
 
   if (userBet < minBet) {
     setErrorMessage(
       `Set your bet (at least ${minBet.toFixed(2)} TON) before readying up`
-    )
-    return
+    );
+    return;
   }
 
-  // cannot bet more than current balance
   if (userBet > tonBalance) {
-    setErrorMessage('Not enough balance for this bet.')
-    return
+    setErrorMessage('Not enough balance for this bet.');
+    return;
   }
 
+  // ✅ make sure current user is actually a player in this lobby
+  const isPlayer = lobby.players.some(p => p.id === currentUser.id);
+  if (!isPlayer) {
+    try {
+      const joinRes = await fetch(`${API}/lobbies/${id}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          name: currentUser.name,
+          // for creator backend should ignore PIN;
+          // other users should use "Join" button first
+        }),
+      });
+
+      if (!joinRes.ok) {
+        const err = await joinRes.json().catch(() => ({}));
+        setErrorMessage(err.error || 'Cannot join lobby');
+        return;
+      }
+    } catch {
+      setErrorMessage('Cannot join lobby');
+      return;
+    }
+  }
+
+  // 🔁 toggle ready on backend
   fetch(`${API}/lobbies/${id}/ready`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId: currentUser.id })
+    body: JSON.stringify({ userId: currentUser.id }),
   })
     .then(res => res.json())
-    .then((lobby: Lobby) =>
-      setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
-    )
-}
+    .then((updated: Lobby) =>
+      setLobbies(prev => prev.map(l => (l.id === updated.id ? updated : l)))
+    );
+};
 
     const startGame = (id: number) => {
     if (!currentUser) return
@@ -463,6 +488,11 @@ const userBet = userBets[id] ?? 0
     selectedLobbyId != null
       ? lobbies.find(l => l.id === selectedLobbyId) || null
       : null
+  const meInSelectedLobby =
+    currentUser && selectedLobby
+      ? selectedLobby.players.find(p => p.id === currentUser.id)
+      : undefined;
+  const isMeReady = !!meInSelectedLobby?.isReady;
 
   const closePopup = () => {
     setSelectedLobbyId(null)
@@ -1625,22 +1655,28 @@ paddingBottom: 100,
   </button>
 )}
 
-{/* READY BUTTON — everyone sees it */}
+{/* READY / UNREADY BUTTON — everyone sees it */}
 <button
   onClick={() => toggleReady(selectedLobby.id)}
   style={{
     padding: '8px 16px',
-    background:
-      'linear-gradient(135deg, #ffe53b 0%, #ff8c00 50%, #ff0080 100%)',
-    color: '#111',
-    border: 'none',
     borderRadius: 999,
+    border: 'none',
     cursor: 'pointer',
     fontSize: 13,
-    fontWeight: 600
+    fontWeight: 600,
+    background: isMeReady
+      // 🔴 UNREADY (currently ready)
+      ? 'linear-gradient(135deg, #fee2e2 0%, #f97373 40%, #b91c1c 100%)'
+      // 🟢 READY (currently not ready)
+      : 'linear-gradient(135deg, #dcfce7 0%, #4ade80 40%, #16a34a 100%)',
+    color: isMeReady ? '#fff' : '#022c22',
+    boxShadow: isMeReady
+      ? '0 0 10px rgba(248,113,113,0.6)'
+      : '0 0 10px rgba(74,222,128,0.6)',
   }}
 >
-  Ready / Unready
+  {isMeReady ? 'Unready' : 'Ready'}
 </button>
 
 {/* START BUTTON — ONLY SHOW IF CREATOR */}
