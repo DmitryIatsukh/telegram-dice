@@ -303,6 +303,15 @@ useEffect(() => {
 
   const createLobby = () => {
   if (!currentUser) return
+  if (newLobbyBet <= 0) {
+    setErrorMessage('Bet must be greater than 0')
+    return
+  }
+
+  if (newLobbyBet > tonBalance) {
+    setErrorMessage("You don't have enough balance for this bet")
+    return
+  }
 
   if (createMode === 'private' && !/^\d{4}$/.test(createPin)) {
     setErrorMessage('Private lobby needs a 4-digit PIN')
@@ -430,6 +439,32 @@ useEffect(() => {
 
   const selectedLobby =
     selectedLobbyId != null ? lobbies.find(l => l.id === selectedLobbyId) || null : null
+  const handleJoinSelectedLobby = () => {
+    if (!currentUser || !selectedLobby) return
+
+    const bet = selectedLobby.betAmount || 0
+    if (bet > tonBalance) {
+      setErrorMessage("Not enough balance to join this lobby")
+      return
+    }
+
+    joinLobby(
+      selectedLobby.id,
+      selectedLobby.isPrivate ? joinPin : undefined
+    )
+  }
+
+  const handleReadySelectedLobby = () => {
+    if (!currentUser || !selectedLobby) return
+
+    const bet = selectedLobby.betAmount || 0
+    if (bet > tonBalance) {
+      setErrorMessage("Not enough balance to ready up in this lobby")
+      return
+    }
+
+    toggleReady(selectedLobby.id)
+  }
 
   const closePopup = () => {
     setSelectedLobbyId(null)
@@ -1186,6 +1221,12 @@ const shortAddress =
             Creator: {lobby.creatorName || 'not set yet (no players)'}
           </p>
                   <p style={{ fontSize: 13, color: '#ccc' }}>Players: {lobby.players.length}</p>
+<p style={{ fontSize: 13, color: '#ccc' }}>
+  Bet per player:{' '}
+  {typeof lobby.betAmount === 'number'
+    ? `${lobby.betAmount.toFixed(2)} TON`
+    : '—'}
+</p>
           <p style={{ fontSize: 13, color: '#ccc' }}>
             Bet: { (lobby.betAmount ?? 1).toFixed(2) } TON
           </p>
@@ -1453,6 +1494,12 @@ const shortAddress =
     : selectedLobby.players
         .map(p => `${p.name} (${p.isReady ? 'ready' : 'not ready'})`)
         .join(', ')}
+</p>
+<p style={{ fontSize: 13, color: '#ccc', marginTop: 6 }}>
+  Bet per player:{' '}
+  {typeof selectedLobby.betAmount === 'number'
+    ? `${selectedLobby.betAmount.toFixed(2)} TON`
+    : '—'}
 </p>
 
           <div
