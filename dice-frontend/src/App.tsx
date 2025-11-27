@@ -87,7 +87,7 @@ const [newLobbyBet, setNewLobbyBet] = useState<number>(1)
 
     const [userBets, setUserBets] = useState<Record<number, number>>({})
   // to avoid applying the same game result multiple times
-  const [processedResults, setProcessedResults] = useState<Set<string>>(new Set())
+  const [processedResults, setProcessedResults] = useState<Set<string>>(new Set());
 
   const [currentPage, setCurrentPage] = useState<Page>('lobbies')
   const [depositAmount, setDepositAmount] = useState('')
