@@ -1475,72 +1475,70 @@ const shortAddress =
               </div>
             </div>
 
-            <button
-              onClick={() =>
-                joinLobby(
-                  selectedLobby.id,
-                  selectedLobby.isPrivate ? joinPin : undefined
-                )
-              }
-              style={{
-                padding: '8px 16px',
-                background:
-                  'linear-gradient(135deg, #00d4ff 0%, #0074ff 60%, #4a00e0 100%)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 999,
-                cursor: 'pointer',
-                fontSize: 13,
-                fontWeight: 600
-              }}
-            >
-              Join Lobby
-            </button>
+            {/* JOIN BUTTON — show only if current user is NOT the creator */}
+{currentUser!.id !== selectedLobby.creatorId && (
+  <button
+    onClick={() =>
+      joinLobby(
+        selectedLobby.id,
+        selectedLobby.isPrivate ? joinPin : undefined
+      )
+    }
+    style={{
+      padding: '8px 16px',
+      background:
+        'linear-gradient(135deg, #00d4ff 0%, #0074ff 60%, #4a00e0 100%)',
+      color: '#fff',
+      border: 'none',
+      borderRadius: 999,
+      cursor: 'pointer',
+      fontSize: 13,
+      fontWeight: 600
+    }}
+  >
+    Join Lobby
+  </button>
+)}
 
-            <button
-              onClick={() => toggleReady(selectedLobby.id)}
-              style={{
-                padding: '8px 16px',
-                background:
-                  'linear-gradient(135deg, #ffe53b 0%, #ff8c00 50%, #ff0080 100%)',
-                color: '#111',
-                border: 'none',
-                borderRadius: 999,
-                cursor: 'pointer',
-                fontSize: 13,
-                fontWeight: 600
-              }}
-            >
-              Ready / Unready
-            </button>
+{/* READY BUTTON — everyone sees it */}
+<button
+  onClick={() => toggleReady(selectedLobby.id)}
+  style={{
+    padding: '8px 16px',
+    background:
+      'linear-gradient(135deg, #ffe53b 0%, #ff8c00 50%, #ff0080 100%)',
+    color: '#111',
+    border: 'none',
+    borderRadius: 999,
+    cursor: 'pointer',
+    fontSize: 13,
+    fontWeight: 600
+  }}
+>
+  Ready / Unready
+</button>
 
-            <button
-              onClick={() => startGame(selectedLobby.id)}
-              style={{
-                padding: '8px 16px',
-                background:
-                  selectedLobby.creatorId === currentUser!.id
-                    ? 'linear-gradient(135deg, #ff4d6a 0%, #ff0000 40%, #8b0000 100%)'
-                    : '#333',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 999,
-                cursor:
-                  selectedLobby.creatorId === currentUser!.id
-                    ? 'pointer'
-                    : 'not-allowed',
-                fontSize: 13,
-                fontWeight: 600,
-                boxShadow:
-                  selectedLobby.creatorId === currentUser!.id
-                    ? '0 0 12px rgba(255,77,106,0.8)'
-                    : 'none'
-              }}
-              disabled={selectedLobby.creatorId !== currentUser!.id}
-            >
-              Start Game
-            </button>
-          </div>
+{/* START BUTTON — ONLY SHOW IF CREATOR */}
+{currentUser!.id === selectedLobby.creatorId && (
+  <button
+    onClick={() => startGame(selectedLobby.id)}
+    style={{
+      padding: '8px 16px',
+      background:
+        'linear-gradient(135deg, #ff4d6a 0%, #ff0000 40%, #8b0000 100%)',
+      color: '#fff',
+      border: 'none',
+      borderRadius: 999,
+      cursor: 'pointer',
+      fontSize: 13,
+      fontWeight: 600,
+      boxShadow: '0 0 12px rgba(255,77,106,0.8)'
+    }}
+  >
+    Start Game
+  </button>
+)}
+
 
           {selectedLobby.gameResult && (
             <div style={{ marginTop: 14 }}>
