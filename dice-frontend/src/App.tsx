@@ -373,8 +373,13 @@ useEffect(() => {
   if (!currentUser) return
 
   // get this lobby + user’s bet for it
-  const lobby = lobbies.find(l => l.id === id)
-  const userBet = userBets[id] ?? 0
+const lobby = lobbies.find(l => l.id === id)
+if (!lobby) {
+  setErrorMessage('Lobby not found')
+  return
+}
+
+const userBet = userBets[id] ?? 0
 
   // minimum bet 0.1 TON
   if (userBet < 0.1) {
