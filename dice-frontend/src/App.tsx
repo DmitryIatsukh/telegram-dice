@@ -327,7 +327,7 @@ useEffect(() => {
       name: currentUser.username || currentUser.name,
       isPrivate: createMode === 'private',
       pin: createMode === 'private' ? createPin : undefined,
-      betAmount: newLobbyBet,            // 👈 NEW
+      betAmount: betToSend,           // 👈 NEW
     }),
   })
     .then(async (res) => {
@@ -372,40 +372,22 @@ useEffect(() => {
   const toggleReady = (id: number) => {
   if (!currentUser) return
 
-  // Find the lobby so we can see its bet
+  // get this lobby + user’s bet for it
   const lobby = lobbies.find(l => l.id === id)
-  if (!lobby) return
+  const userBet = userBets[id] ?? 0
 
-  const bet = lobby.betAmount ?? 1
-
-  // Is the current user already in this lobby and ready?
-  const me = lobby.players.find(p => p.id === currentUser.id)
-  const isCurrentlyReady = me?.isReady ?? false
-
-  // If we are going from NOT ready -> READY, check balance first
-  if (!isCurrentlyReady) {
-    if (tonBalance < bet) {
-      setErrorMessage(
-        `Not enough balance. You need at least ${bet.toFixed(2)} TON to play in this lobby.`
-      )
-      return
-    }
-
-    // Register this lobby bet for result calculation
-    setUserBets(prev => ({
-      ...prev,
-      [id]: bet
-    }))
-  } else {
-    // If we unready, remove the bet for this lobby
-    setUserBets(prev => {
-      const copy = { ...prev }
-      delete copy[id]
-      return copy
-    })
+  // minimum bet 0.1 TON
+  if (userBet < 0.1) {
+    setErrorMessage('Set your bet (at least 0.1 TON) before getting ready.')
+    return
   }
 
-  // Call backend to toggle ready flag
+  // cannot bet more than current balance
+  if (userBet > tonBalance) {
+    setErrorMessage('Not enough balance for this bet.')
+    return
+  }
+
   fetch(`${API}/lobbies/${id}/ready`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
