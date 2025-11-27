@@ -86,7 +86,8 @@ const [newLobbyBet, setNewLobbyBet] = useState<number>(1)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
     const [userBets, setUserBets] = useState<Record<number, number>>({})
-  const [processedResults, setProcessedResults] = useState<number[]>([])
+  // to avoid applying the same game result multiple times
+  const [processedResults, setProcessedResults] = useState<Set<string>>(new Set())
 
   const [currentPage, setCurrentPage] = useState<Page>('lobbies')
   const [depositAmount, setDepositAmount] = useState('')
@@ -214,8 +215,101 @@ useEffect(() => {
       setCurrentUser(null);
     }
   }, []);
+    // ---- apply game results to balance (with 5% house rake) ----
+  useEffect(() => {
+    if (!currentUser) return
+    if (!lobbies || lobbies.length === 0) return
 
+    const newProcessed = new Set(processedResults)
+    let totalDelta = 0
+    const newHistory: HistoryItem[] = []
 
+    for (const lobby of lobbies) {
+      const gr = lobby.gameResult
+      if (!gr) continue
+
+      // unique key for "this exact game result"
+      const key =
+        lobby.id +
+        ':' +
+        gr.winnerId +
+        ':' +
+        gr.highest +
+        ':' +
+        gr.players.map(p => `${p.id}:${p.roll}`).join('|')
+
+      if (newProcessed.has(key)) continue
+
+      const players = gr.players
+      const nPlayers = players.length
+      if (!players.some(p => p.id === currentUser.id)) {
+        newProcessed.add(key)
+        continue
+      }
+
+      // base bet per player
+      const baseBet =
+        typeof lobby.betAmount === 'number' && lobby.betAmount > 0
+          ? lobby.betAmount
+          : 0.1
+
+      const pot = baseBet * nPlayers                 // total on the table
+      const houseFee = pot * 0.05                    // 5% rake
+      const payoutAfterRake = pot - houseFee         // what winner actually gets
+
+      const isWinner = gr.winnerId === currentUser.id
+
+      // 🧮 two numbers:
+      // 1) deltaForUser -> how much to change balance
+      // 2) displayAmount -> what we show as "you won / lost X TON"
+      let deltaForUser = 0
+      let displayAmount = 0
+
+      if (isWinner) {
+        // balance change is profit = payout - your own stake
+        deltaForUser = payoutAfterRake - baseBet     // e.g. 1.9 - 1 = +0.9
+        displayAmount = payoutAfterRake              // e.g. 1.9 → "You won 1.9 TON"
+      } else {
+        // losers just lose their stake
+        deltaForUser = -baseBet                      // e.g. -1
+        displayAmount = baseBet                      // e.g. 1.0 → "You lost 1.0 TON"
+      }
+
+      if (deltaForUser !== 0) {
+        totalDelta += deltaForUser
+
+        const now = new Date()
+        const createdAt =
+          now.getFullYear() +
+          '-' +
+          String(now.getMonth() + 1).padStart(2, '0') +
+          '-' +
+          String(now.getDate()).padStart(2, '0') +
+          ' ' +
+          String(now.getHours()).padStart(2, '0') +
+          ':' +
+          String(now.getMinutes()).padStart(2, '0')
+
+        newHistory.push({
+          id: Date.now() + Math.random(),
+          type: 'bet',
+          amount: displayAmount,         // 👈 show payout (win) or stake (loss)
+          currency: 'TON',
+          result: isWinner ? 'win' : 'lose',
+          createdAt,
+          playerName: currentUser.name
+        })
+      }
+
+      newProcessed.add(key)
+    }
+
+    if (totalDelta !== 0 || newHistory.length > 0) {
+      setTonBalance(prev => prev + totalDelta)
+      setHistory(prev => [...newHistory, ...prev].slice(0, 30))
+      setProcessedResults(newProcessed)
+    }
+  }, [lobbies, currentUser, processedResults])
   // ---- lobby actions ----
 
   const createLobby = () => {
