@@ -88,7 +88,7 @@ const [newLobbyBet, setNewLobbyBet] = useState<number>(1)
 
     const [userBets, setUserBets] = useState<Record<number, number>>({})
   // to avoid applying the same game result multiple times
-  const [processedResults, setProcessedResults] = useState<Set<string>>(new Set());
+  const [processedResults, setProcessedResults] = useState<number[]>([])
   const [currentPage, setCurrentPage] = useState<Page>('lobbies')
   const [depositAmount, setDepositAmount] = useState('')
   const [withdrawAmount, setWithdrawAmount] = useState('')
@@ -593,7 +593,7 @@ const handleWithdraw = async () => {
     if (!currentUser) return
 
     // use a Set internally, but store array in state for React
-    const already = new Set(processedResults)
+    const already = new Set<number>(processedResults)
     let changed = false
     let deltaTotal = 0
     const newHistoryItems: HistoryItem[] = []
