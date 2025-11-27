@@ -88,7 +88,7 @@ const [newLobbyBet, setNewLobbyBet] = useState<number>(1)
 
     const [userBets, setUserBets] = useState<Record<number, number>>({})
   // to avoid applying the same game result multiple times
-  const [processedResults, setProcessedResults] = useState<Set<number>>(new Set());
+  const [processedResults, setProcessedResults] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState<Page>('lobbies')
   const [depositAmount, setDepositAmount] = useState('')
   const [withdrawAmount, setWithdrawAmount] = useState('')
@@ -220,7 +220,7 @@ useEffect(() => {
   if (!currentUser) return;
   if (!lobbies || lobbies.length === 0) return;
 
-  const newProcessed = new Set(processedResults);
+ const newProcessed: Set<string> = new Set(processedResults);
   let totalDelta = 0;
   const newHistory: HistoryItem[] = [];
 
