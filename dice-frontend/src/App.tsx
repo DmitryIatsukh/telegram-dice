@@ -1227,6 +1227,37 @@ const shortAddress =
           <p style={{ fontSize: 13, color: '#ccc' }}>
             Bet: { (lobby.betAmount ?? 1).toFixed(2) } TON
           </p>
+    {lobby.status === 'finished' && lobby.gameResult && (
+      <div style={{ marginTop: 6, fontSize: 12 }}>
+        <div style={{ color: '#bbf7d0' }}>
+          Winner:{' '}
+          <span style={{ fontWeight: 700 }}>
+            {lobby.gameResult.winnerName}
+          </span>{' '}
+          (roll {lobby.gameResult.highest})
+        </div>
+
+        {currentUser && (
+          (() => {
+            const me = lobby.gameResult!.players.find(
+              p => p.id === currentUser.id
+            )
+            if (!me) return null
+            const didWin = lobby.gameResult!.winnerId === currentUser.id
+            return (
+              <div
+                style={{
+                  marginTop: 2,
+                  color: didWin ? '#22c55e' : '#f97316'
+                }}
+              >
+                You {didWin ? 'won' : 'lost'} with roll {me.roll}
+              </div>
+            )
+          })()
+        )}
+      </div>
+    )}
           <button
             onClick={() => setSelectedLobbyId(lobby.id)}
             style={{
@@ -1243,8 +1274,8 @@ const shortAddress =
               boxShadow: '0 0 12px rgba(0,116,255,0.8)'
             }}
           >
-            Open Lobby
-          </button>
+            {lobby.status === 'finished' ? 'View result' : 'Open Lobby'}
+    </button>
         </div>
       ))}
     </>
