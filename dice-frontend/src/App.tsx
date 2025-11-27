@@ -593,56 +593,6 @@ const handleWithdraw = async () => {
     const newHistoryItems: HistoryItem[] = []
 
     lobbies.forEach(lobby => {
-     // ---- only finished games with a result: update balance with rake ----
-useEffect(() => {
-  if (!currentUser) return;
-  if (!lobbies || lobbies.length === 0) return;
-
-  // ✅ track processed lobbies by numeric ID
-  const already = new Set<number>(processedBetLobbies);
-  let changed = false;
-  let deltaTotal = 0;
-  const newHistoryItems: HistoryItem[] = [];
-
-  lobbies.forEach(lobby => {
-    // only finished games with a result
-    if (lobby.status !== 'finished') return;
-    if (!lobby.gameResult) return;
-    if (already.has(lobby.id)) return;
-
-    const betBase =
-      userBets[lobby.id] ??
-      (typeof lobby.betAmount === 'number' ? lobby.betAmount : 0);
-
-    if (!betBase || betBase <= 0) return;
-
-    const isWin = lobby.gameResult.winnerId === currentUser.id;
-    const delta = isWin ? betBase * 0.95 : -betBase; // 5% rake on win
-
-    deltaTotal += delta;
-    changed = true;
-    already.add(lobby.id);
-
-    newHistoryItems.push({
-      id: Date.now() + lobby.id + Math.random(),
-      type: 'bet',
-      amount: Math.abs(delta),
-      currency: 'TON',
-      result: isWin ? 'win' : 'lose',
-      createdAt: new Date().toLocaleString(),
-      playerName: currentUser.name
-    });
-  });
-
-  if (!changed) return;
-
-  // update balance & history
-  setTonBalance(prev => prev + deltaTotal);
-  setHistory(prev => [...newHistoryItems, ...prev]);
-
-  // ✅ store processed lobby IDs as array<number>
-  setProcessedBetLobbies(Array.from(already));
-}, [lobbies, currentUser, userBets]);
 
     // 2) sync wallet to backend (so reload keeps same balance)
     ;(async () => {
