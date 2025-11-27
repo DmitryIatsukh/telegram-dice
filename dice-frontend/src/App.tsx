@@ -1600,7 +1600,7 @@ paddingBottom: 100,
     left: 0,
     right: 0,
     bottom: 0,
-    padding: '4px 0 calc(env(safe-area-inset-bottom, 0px) + 4px)',
+    padding: '2px 0 calc(env(safe-area-inset-bottom, 0px) + 4px)',
     background:
       'linear-gradient(135deg, rgba(0,40,100,0.96), rgba(0,15,60,0.96))',
     borderTop: '1px solid rgba(0,140,255,0.35)',
@@ -1611,8 +1611,8 @@ paddingBottom: 100,
 >
   <div
     style={{
-      width: '90%',
-      maxWidth: 420,
+      width: '86%',
+      maxWidth: 380,
       display: 'flex',
       gap: 8,
       padding: 4,
