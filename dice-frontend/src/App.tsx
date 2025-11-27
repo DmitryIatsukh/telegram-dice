@@ -85,10 +85,10 @@ const [newLobbyBet, setNewLobbyBet] = useState<number>(1)
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const [userBets, setUserBets] = useState<Record<number, number>>({})
+    const [userBets, setUserBets] = useState<Record<number, number>>({})
+  const [processedResults, setProcessedResults] = useState<number[]>([])
 
   const [currentPage, setCurrentPage] = useState<Page>('lobbies')
-
   const [depositAmount, setDepositAmount] = useState('')
   const [withdrawAmount, setWithdrawAmount] = useState('')
 
@@ -497,7 +497,74 @@ const handleWithdraw = async () => {
   }
 };
 
+  // ---- apply finished game results to balance + history and sync wallet ----
+  useEffect(() => {
+    if (!currentUser) return
 
+    // use a Set internally, but store array in state for React
+    const already = new Set(processedResults)
+    let changed = false
+    let deltaTotal = 0
+    const newHistoryItems: HistoryItem[] = []
+
+    lobbies.forEach(lobby => {
+      // only finished games with a result, and not processed yet
+      if (lobby.status !== 'finished') return
+      if (!lobby.gameResult) return
+      if (already.has(lobby.id)) return
+
+      const betBase =
+        userBets[lobby.id] ??
+        (typeof lobby.betAmount === 'number' ? lobby.betAmount : 0)
+
+      if (!betBase || betBase <= 0) return
+
+      const isWin = lobby.gameResult.winnerId === currentUser.id
+      const delta = isWin ? betBase : -betBase
+
+      deltaTotal += delta
+      changed = true
+      already.add(lobby.id)
+
+      newHistoryItems.push({
+        id: Date.now() + lobby.id + Math.random(),
+        type: 'bet',
+        amount: Math.abs(delta),
+        currency: 'TON',
+        result: isWin ? 'win' : 'lose',
+        createdAt: new Date().toLocaleString(),
+        playerName: currentUser.name
+      })
+    })
+
+    if (!changed) return
+
+    // 1) update local balance + history
+    const updatedBalance = tonBalance + deltaTotal
+    const updatedHistory = [...newHistoryItems, ...history].slice(0, 50)
+
+    setTonBalance(updatedBalance)
+    setHistory(updatedHistory)
+    setProcessedResults(Array.from(already))
+
+    // 2) sync wallet to backend (so reload keeps same balance)
+    ;(async () => {
+      try {
+        await fetch(`${API_BASE}/api/wallet/sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegramId: currentUser.id,
+            username: currentUser.username || currentUser.name,
+            balance: updatedBalance,
+            history: updatedHistory
+          })
+        })
+      } catch (e) {
+        console.log('wallet sync error', e)
+      }
+    })()
+  }, [lobbies, currentUser, userBets, processedResults, tonBalance, history])
 
   // ---- derived: last win & biggest win ----
 
