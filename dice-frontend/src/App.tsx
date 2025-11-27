@@ -749,7 +749,7 @@ const shortAddress =
             </div>
           </div>
 
-          <div
+                   <div
             style={{
               display: 'flex',
               alignItems: 'flex-start',
@@ -757,6 +757,7 @@ const shortAddress =
               flexWrap: 'wrap'
             }}
           >
+            {/* LEFT: balance number */}
             <div>
               <div
                 style={{
@@ -797,7 +798,9 @@ const shortAddress =
               </div>
             </div>
 
+            {/* RIGHT: deposit + withdraw rows */}
             <div style={{ flex: 1, minWidth: 0 }}>
+              {/* DEPOSIT ROW */}
               <div style={{ marginBottom: 10 }}>
                 <div style={{ fontSize: 12, marginBottom: 4, color: '#c7d2fe' }}>
                   💰 Deposit (TonConnect)
@@ -806,7 +809,8 @@ const shortAddress =
                   style={{
                     display: 'flex',
                     gap: 6,
-                    flexWrap: 'nowrap'
+                    flexWrap: 'nowrap',
+                    alignItems: 'center'
                   }}
                 >
                   <input
@@ -825,30 +829,30 @@ const shortAddress =
                     }}
                   />
                   <button
-  onClick={handleDeposit}
-  disabled={isDepositing}
-  style={{
-    padding: '6px 10px',
-    borderRadius: 999,
-    border: 'none',
-    background:
-      'linear-gradient(135deg, #00d65c 0%, #25ff9a 50%, #eaffd0 100%)',
-    color: '#0c1b16',
-    fontSize: 12,
-    fontWeight: 700,
-    cursor: isDepositing ? 'wait' : 'pointer',
-    whiteSpace: 'nowrap',
-    opacity: isDepositing ? 0.6 : 1,
- minWidth: 90,
-    textAlign: 'center',
-  }}
->
-  {isDepositing ? 'Processing…' : '💸 Deposit'}
-</button>
-
+                    onClick={handleDeposit}
+                    disabled={isDepositing}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: 999,
+                      border: 'none',
+                      background:
+                        'linear-gradient(135deg, #00d65c 0%, #25ff9a 50%, #eaffd0 100%)',
+                      color: '#0c1b16',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: isDepositing ? 'wait' : 'pointer',
+                      whiteSpace: 'nowrap',
+                      opacity: isDepositing ? 0.6 : 1,
+                      width: 120,
+                      textAlign: 'center'
+                    }}
+                  >
+                    {isDepositing ? 'Processing…' : '💸 Deposit'}
+                  </button>
                 </div>
               </div>
 
+              {/* WITHDRAW ROW */}
               <div>
                 <div style={{ fontSize: 12, marginBottom: 4, color: '#fed7aa' }}>
                   🏧 Withdraw (internal for now)
@@ -857,7 +861,8 @@ const shortAddress =
                   style={{
                     display: 'flex',
                     gap: 6,
-                    flexWrap: 'nowrap'
+                    flexWrap: 'nowrap',
+                    alignItems: 'center'
                   }}
                 >
                   <input
@@ -876,27 +881,26 @@ const shortAddress =
                     }}
                   />
                   <button
-  onClick={handleWithdraw}
-  disabled={isWithdrawing}
-  style={{
-    padding: '6px 10px',
-    borderRadius: 999,
-    border: 'none',
-    background:
-      'linear-gradient(135deg, #f97316 0%, #fb7185 50%, #fee2e2 100%)',
-    color: '#111827',
-    fontSize: 12,
-    fontWeight: 700,
-    cursor: isWithdrawing ? 'wait' : 'pointer',
-    whiteSpace: 'nowrap',
-    opacity: isWithdrawing ? 0.6 : 1,
-minWidth: 90,
-    textAlign: 'center',
-  }}
->
-  {isWithdrawing ? 'Processing…' : '📤 Withdraw'}
-</button>
-
+                    onClick={handleWithdraw}
+                    disabled={isWithdrawing}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: 999,
+                      border: 'none',
+                      background:
+                        'linear-gradient(135deg, #f97316 0%, #fb7185 50%, #fee2e2 100%)',
+                      color: '#111827',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: isWithdrawing ? 'wait' : 'pointer',
+                      whiteSpace: 'nowrap',
+                      opacity: isWithdrawing ? 0.6 : 1,
+                      width: 120,
+                      textAlign: 'center'
+                    }}
+                  >
+                    {isWithdrawing ? 'Processing…' : '📤 Withdraw'}
+                  </button>
                 </div>
               </div>
             </div>
@@ -1238,6 +1242,7 @@ minWidth: 90,
           'radial-gradient(circle at top, #0044cc 0%, #001b4d 40%, #000814 100%)',
         color: '#fff',
         padding: 16,
+paddingBottom: 80, 
         position: 'relative'
       }}
     >
@@ -1644,9 +1649,74 @@ minWidth: 90,
             </div>
           )}
         </div>
+
       </div>
       )}
+{/* Bottom toolbar */}
+<div
+  style={{
+    position: 'fixed',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 8,
+    background:
+      'linear-gradient(135deg, rgba(0,40,100,0.96), rgba(0,15,60,0.96))',
+    borderTop: '1px solid rgba(0,140,255,0.35)',
+    display: 'flex',
+    justifyContent: 'space-around',
+    gap: 10,
+    zIndex: 20
+  }}
+>
+  <button
+    onClick={() => setCurrentPage('lobbies')}
+    style={{
+      flex: 1,
+      padding: '8px 12px',
+      borderRadius: 999,
+      border: 'none',
+      cursor: 'pointer',
+      fontSize: 13,
+      background:
+        currentPage === 'lobbies'
+          ? 'linear-gradient(135deg, #0084ff 0%, #00c4ff 50%, #6dd5fa 100%)'
+          : 'transparent',
+      color: currentPage === 'lobbies' ? '#111' : '#e5e7eb',
+      fontWeight: 600,
+      boxShadow:
+        currentPage === 'lobbies'
+          ? '0 0 12px rgba(0,150,255,0.9)'
+          : 'none'
+    }}
+  >
+    Lobbies
+  </button>
 
+  <button
+    onClick={() => setCurrentPage('profile')}
+    style={{
+      flex: 1,
+      padding: '8px 12px',
+      borderRadius: 999,
+      border: 'none',
+      cursor: 'pointer',
+      fontSize: 13,
+      background:
+        currentPage === 'profile'
+          ? 'linear-gradient(135deg, #00c4ff 0%, #007bff 60%, #0036a3 100%)'
+          : 'transparent',
+      color: currentPage === 'profile' ? '#fff' : '#e5e7eb',
+      fontWeight: 600,
+      boxShadow:
+        currentPage === 'profile'
+          ? '0 0 12px rgba(0,150,255,0.9)'
+          : 'none'
+    }}
+  >
+    Profile
+  </button>
+</div>
       {/* Error overlay */}
       {errorMessage && (
         <div
