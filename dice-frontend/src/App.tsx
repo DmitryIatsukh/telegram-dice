@@ -345,6 +345,13 @@ useEffect(() => {
       setSelectedLobbyId(lobby.id)
       setCreatePin('')
       setCurrentPage('lobbies')
+      // ⭐ Auto-join lobby creator (so he becomes a player immediately)
+      if (currentUser) {
+        joinLobby(
+          lobby.id,
+          createMode === 'private' ? createPin : undefined
+        )
+      }
     })
 }
 
@@ -386,77 +393,57 @@ useEffect(() => {
       }
       return res.json()
     })
-    .then((lobby: Lobby | null) => {
+    .then((lobby: Lobby | null) => {.
       if (!lobby) return
       setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
       setJoinPin('')
     })
 }
 
-  const toggleReady = async (id: number) => {
-  if (!currentUser) return;
+  const toggleReady = (id: number) => {
+  if (!currentUser) return
 
-  const lobby = lobbies.find(l => l.id === id);
+  const lobby = lobbies.find(l => l.id === id)
   if (!lobby) {
-    setErrorMessage('Lobby not found');
-    return;
+    setErrorMessage('Lobby not found')
+    return
   }
 
-  const userBet = userBets[id] ?? 0;
+  // must already be in this lobby
+  const isInLobby = lobby.players.some(p => p.id === currentUser.id)
+  if (!isInLobby) {
+    setErrorMessage('Join the lobby before setting ready.')
+    return
+  }
+
+  const userBet = userBets[id] ?? 0
 
   // minimum bet: lobby base bet (if exists) OR 0.1
   const minBet =
-    lobby.betAmount != null && lobby.betAmount > 0 ? lobby.betAmount : 0.1;
+    lobby.betAmount != null && lobby.betAmount > 0 ? lobby.betAmount : 0.1
 
   if (userBet < minBet) {
     setErrorMessage(
       `Set your bet (at least ${minBet.toFixed(2)} TON) before readying up`
-    );
-    return;
+    )
+    return
   }
 
   if (userBet > tonBalance) {
-    setErrorMessage('Not enough balance for this bet.');
-    return;
+    setErrorMessage('Not enough balance for this bet.')
+    return
   }
 
-  // ✅ make sure current user is actually a player in this lobby
-  const isPlayer = lobby.players.some(p => p.id === currentUser.id);
-  if (!isPlayer) {
-    try {
-      const joinRes = await fetch(`${API}/lobbies/${id}/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: currentUser.id,
-          name: currentUser.name,
-          // for creator backend should ignore PIN;
-          // other users should use "Join" button first
-        }),
-      });
-
-      if (!joinRes.ok) {
-        const err = await joinRes.json().catch(() => ({}));
-        setErrorMessage(err.error || 'Cannot join lobby');
-        return;
-      }
-    } catch {
-      setErrorMessage('Cannot join lobby');
-      return;
-    }
-  }
-
-  // 🔁 toggle ready on backend
   fetch(`${API}/lobbies/${id}/ready`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId: currentUser.id }),
+    body: JSON.stringify({ userId: currentUser.id })
   })
     .then(res => res.json())
     .then((updated: Lobby) =>
       setLobbies(prev => prev.map(l => (l.id === updated.id ? updated : l)))
-    );
-};
+    )
+}
 
     const startGame = (id: number) => {
     if (!currentUser) return
@@ -483,7 +470,47 @@ useEffect(() => {
         }
       })
   }
+const leaveLobby = (id: number) => {
+  if (!currentUser) return
 
+  fetch(`${API}/lobbies/${id}/leave`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId: currentUser.id })
+  })
+    .then(async res => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        setErrorMessage(err.error || 'Cannot leave lobby')
+        return null
+      }
+      return res.json()
+    })
+    .then((lobby: Lobby | null) => {
+      if (!lobby) return
+      setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
+    })
+}
+
+const cancelLobby = (id: number) => {
+  if (!currentUser) return
+
+  fetch(`${API}/lobbies/${id}/cancel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId: currentUser.id })
+  })
+    .then(async res => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        setErrorMessage(err.error || 'Cannot cancel lobby')
+        return
+      }
+      // remove lobby from list and close popup
+      setLobbies(prev => prev.filter(l => l.id !== id))
+      setSelectedLobbyId(null)
+    })
+}
     const selectedLobby =
     selectedLobbyId != null
       ? lobbies.find(l => l.id === selectedLobbyId) || null
@@ -493,6 +520,9 @@ useEffect(() => {
       ? selectedLobby.players.find(p => p.id === currentUser.id)
       : undefined;
   const isMeReady = !!meInSelectedLobby?.isReady;
+const isMeInLobby = !!meInSelectedLobby
+  const isMeCreator =
+    !!currentUser && !!selectedLobby && currentUser.id === selectedLobby.creatorId
 
   const closePopup = () => {
     setSelectedLobbyId(null)
@@ -1540,7 +1570,7 @@ paddingBottom: 100,
     : '—'}
 </p>
 
-          <div
+                  <div
             style={{
               display: 'flex',
               flexWrap: 'wrap',
@@ -1569,137 +1599,108 @@ paddingBottom: 100,
               </div>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 13 }}>Your bet (TON):</span>
-              <input
-                type="text"
-                value={
-  userBets[selectedLobby.id] !== undefined
-    ? userBets[selectedLobby.id].toString()
-    : selectedLobby.betAmount != null
-    ? selectedLobby.betAmount.toString()
-    : ''
-}
-                onChange={e => {
-                  const raw = e.target.value.replace(/[^0-9.]/g, '')
-                  const parsed = parseFloat(raw)
-                  setUserBets(prev => ({
-                    ...prev,
-                    [selectedLobby.id]: isNaN(parsed) ? 0 : parsed
-                  }))
-                }}
-                style={{
-                  padding: '4px 8px',
-                  borderRadius: 6,
-                  border: '1px solid #555',
-                  background: '#050511',
-                  color: '#fff',
-                  width: 100
-                }}
-              />
-              <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
-                {[0.1, 0.5, 1].map(val => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() =>
-                      setUserBets(prev => {
-                        const current = prev[selectedLobby.id] || 0
-                        const updated = Math.round((current + val) * 100) / 100
-                        return { ...prev, [selectedLobby.id]: updated }
-                      })
-                    }
+            {/* 🧍‍♂️ Join / Leave button (everyone) */}
+            <button
+              onClick={() =>
+                isMeInLobby
+                  ? leaveLobby(selectedLobby.id)
+                  : joinLobby(
+                      selectedLobby.id,
+                      selectedLobby.isPrivate ? joinPin : undefined
+                    )
+              }
+              style={{
+                padding: '8px 16px',
+                background: isMeInLobby
+                  ? 'linear-gradient(135deg, #fee2e2 0%, #f97373 40%, #b91c1c 100%)'
+                  : 'linear-gradient(135deg, #00d4ff 0%, #0074ff 60%, #4a00e0 100%)',
+                color: isMeInLobby ? '#fff' : '#fff',
+                border: 'none',
+                borderRadius: 999,
+                cursor: 'pointer',
+                fontSize: 13,
+                fontWeight: 600
+              }}
+            >
+              {isMeInLobby ? 'Leave Lobby' : 'Join Lobby'}
+            </button>
+
+            {/* 🎚 Ready switch (only non-creator AND already in lobby) */}
+            {!isMeCreator && isMeInLobby && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 13 }}>Ready</span>
+                <div
+                  onClick={() => toggleReady(selectedLobby.id)}
+                  style={{
+                    width: 46,
+                    height: 24,
+                    borderRadius: 999,
+                    padding: 2,
+                    display: 'flex',
+                    justifyContent: isMeReady ? 'flex-end' : 'flex-start',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    background: isMeReady
+                      ? 'linear-gradient(135deg, #dcfce7 0%, #4ade80 50%, #16a34a 100%)'
+                      : 'linear-gradient(135deg, #fee2e2 0%, #fca5a5 50%, #b91c1c 100%)',
+                    boxShadow: isMeReady
+                      ? '0 0 10px rgba(74,222,128,0.7)'
+                      : '0 0 10px rgba(248,113,113,0.7)'
+                  }}
+                >
+                  <div
                     style={{
-                      padding: '2px 6px',
-                      borderRadius: 999,
-                      border: 'none',
-                      background:
-                        'linear-gradient(135deg, #ff0080 0%, #ff8c00 60%, #ffe53b 100%)',
-                      color: '#111',
-                      fontSize: 11,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 3
+                      width: 20,
+                      height: 20,
+                      borderRadius: '50%',
+                      background: '#fff'
                     }}
-                  >
-                    <span>🎰</span>
-                    <span>+{val}</span>
-                  </button>
-                ))}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* JOIN BUTTON — show only if current user is NOT the creator */}
-{currentUser!.id !== selectedLobby.creatorId && (
-  <button
-    onClick={() =>
-      joinLobby(
-        selectedLobby.id,
-        selectedLobby.isPrivate ? joinPin : undefined
-      )
-    }
-    style={{
-      padding: '8px 16px',
-      background:
-        'linear-gradient(135deg, #00d4ff 0%, #0074ff 60%, #4a00e0 100%)',
-      color: '#fff',
-      border: 'none',
-      borderRadius: 999,
-      cursor: 'pointer',
-      fontSize: 13,
-      fontWeight: 600
-    }}
-  >
-    Join Lobby
-  </button>
-)}
+            {/* 🚫 Cancel lobby (creator only) */}
+            {isMeCreator && (
+              <button
+                onClick={() => cancelLobby(selectedLobby.id)}
+                style={{
+                  padding: '8px 16px',
+                  background:
+                    'linear-gradient(135deg, #f97316 0%, #ef4444 40%, #7f1d1d 100%)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 999,
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600
+                }}
+              >
+                Cancel Lobby
+              </button>
+            )}
 
-{/* READY / UNREADY BUTTON — everyone sees it */}
-<button
-  onClick={() => toggleReady(selectedLobby.id)}
-  style={{
-    padding: '8px 16px',
-    borderRadius: 999,
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: 13,
-    fontWeight: 600,
-    background: isMeReady
-      // 🔴 UNREADY (currently ready)
-      ? 'linear-gradient(135deg, #fee2e2 0%, #f97373 40%, #b91c1c 100%)'
-      // 🟢 READY (currently not ready)
-      : 'linear-gradient(135deg, #dcfce7 0%, #4ade80 40%, #16a34a 100%)',
-    color: isMeReady ? '#fff' : '#022c22',
-    boxShadow: isMeReady
-      ? '0 0 10px rgba(248,113,113,0.6)'
-      : '0 0 10px rgba(74,222,128,0.6)',
-  }}
->
-  {isMeReady ? 'Unready' : 'Ready'}
-</button>
-
-{/* START BUTTON — ONLY SHOW IF CREATOR */}
-{currentUser!.id === selectedLobby.creatorId && (
-  <button
-    onClick={() => startGame(selectedLobby.id)}
-    style={{
-      padding: '8px 16px',
-      background:
-        'linear-gradient(135deg, #ff4d6a 0%, #ff0000 40%, #8b0000 100%)',
-      color: '#fff',
-      border: 'none',
-      borderRadius: 999,
-      cursor: 'pointer',
-      fontSize: 13,
-      fontWeight: 600,
-      boxShadow: '0 0 12px rgba(255,77,106,0.8)'
-    }}
-  >
-    Start Game
-  </button>
-)}
-</div>
+            {/* ▶️ Start Game — creator only */}
+            {isMeCreator && (
+              <button
+                onClick={() => startGame(selectedLobby.id)}
+                style={{
+                  padding: '8px 16px',
+                  background:
+                    'linear-gradient(135deg, #22c55e 0%, #16a34a 40%, #14532d 100%)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 999,
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  boxShadow: '0 0 12px rgba(34,197,94,0.7)'
+                }}
+              >
+                Start Game
+              </button>
+            )}
+          </div>
 
           {selectedLobby.gameResult && (
             <div style={{ marginTop: 14 }}>
