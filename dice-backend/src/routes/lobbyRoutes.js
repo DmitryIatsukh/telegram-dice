@@ -23,11 +23,15 @@ router.get('/', (req, res) => {
 
 // ===== CREATE A NEW LOBBY (creator auto-joins) =====
 router.post('/create', (req, res) => {
-  const { userId, name, isPrivate, pin } = req.body || {}
+  const { userId, name, isPrivate, pin, betAmount } = req.body || {}
 
   if (!userId || !name) {
     return res.status(400).json({ error: 'userId and name are required' })
   }
+    // bet per player (internal dice balance units)
+  const numericBet =
+    typeof betAmount === 'number' && betAmount > 0
+      ? betAmount
 
   let privateFlag = !!isPrivate
   let pinValue = null
