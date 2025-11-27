@@ -49,15 +49,11 @@ type HistoryItem = {
 type Page = 'lobbies' | 'profile'
 
 function App() {
-  // demo manifest so TonConnect always works
-  const TON_MANIFEST_URL = `${window.location.origin}/tonconnect-manifest.json`;
-  // TEMP FIX while local dev: if manifest cannot load, fallback to demo
-const FALLBACK_MANIFEST = "https://ton-connect.github.io/demo-dapp/tonconnect-manifest.json";
-
-const finalManifestUrl = window.location.hostname.includes("ngrok")
-  ? FALLBACK_MANIFEST
-  : TON_MANIFEST_URL;
-
+  const TON_MANIFEST_URL =
+  window.location.hostname === "localhost" ||
+  window.location.hostname.includes("ngrok")
+    ? "https://ton-connect.github.io/demo-dapp/tonconnect-manifest.json"
+    : `${window.location.origin}/tonconnect-manifest.json`;
   return (
     <TonConnectUIProvider manifestUrl={TON_MANIFEST_URL}>
       <DiceApp />
