@@ -86,7 +86,6 @@ const [newLobbyBet, setNewLobbyBet] = useState<number>(1)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const [userBets, setUserBets] = useState<Record<number, number>>({})
-  const [processedResults, setProcessedResults] = useState<Set<string>>(new Set())
 
   const [currentPage, setCurrentPage] = useState<Page>('lobbies')
 
