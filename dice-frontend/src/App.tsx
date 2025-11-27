@@ -222,7 +222,8 @@ useEffect(() => {
   if (!currentUser) return;
   if (!lobbies || lobbies.length === 0) return;
 
- const newProcessed: Set<string> = new Set(processedResults);
+  // processedResults: string[]
+  const newProcessed = new Set<string>(processedResults);
   let totalDelta = 0;
   const newHistory: HistoryItem[] = [];
 
@@ -230,7 +231,7 @@ useEffect(() => {
     const gr = lobby.gameResult;
     if (!gr) continue;
 
-    // Unique ID for this game result
+    // unique key for this exact finished game
     const key =
       lobby.id +
       ':' +
@@ -238,77 +239,68 @@ useEffect(() => {
       ':' +
       gr.highest +
       ':' +
-      gr.players.map(p => `${p.id}:${p.roll}`).join('|');
+      gr.players.map(p => `${p.id}:${p.roll}`).join(',');
 
+    // already applied => skip
     if (newProcessed.has(key)) continue;
 
     const players = gr.players;
     const nPlayers = players.length;
 
-    // Skip if user not in this match
+    // if current user is not in this game – just mark as processed
     if (!players.some(p => p.id === currentUser.id)) {
       newProcessed.add(key);
       continue;
     }
 
-    const baseBet =
-      typeof lobby.betAmount === 'number' && lobby.betAmount > 0
-        ? lobby.betAmount
-        : 0.1;
+    // base bet for THIS user in this lobby
+    const betBase =
+      userBets[lobby.id] ??
+      (typeof lobby.betAmount === 'number' ? lobby.betAmount : 0);
 
-    const pot = baseBet * nPlayers;
-    const houseFee = pot * 0.05; // 5%
-    const payoutAfterRake = pot - houseFee;
+    if (!betBase || betBase <= 0) {
+      newProcessed.add(key);
+      continue;
+    }
 
     const isWinner = gr.winnerId === currentUser.id;
 
-    let deltaForUser = 0;
-    let displayAmount = 0;
+    // total pot is betBase * nPlayers
+    const totalPot = betBase * nPlayers;
 
-    if (isWinner) {
-      // Balance change = net profit after rake
-      deltaForUser = payoutAfterRake - baseBet; // e.g. +0.9
-      displayAmount = payoutAfterRake; // show full 1.9 as win
-    } else {
-      deltaForUser = -baseBet;
-      displayAmount = baseBet; // show 1.0 as loss
-    }
+    // house rake is 5% of total pot, but only applied if user wins
+    const rake = isWinner ? totalPot * 0.05 : 0;
 
-    if (deltaForUser !== 0) {
-      totalDelta += deltaForUser;
+    // gross win for the winner = pot - own bet
+    const grossWin = isWinner ? totalPot - betBase : 0;
 
-      const now = new Date();
-      const createdAt =
-        now.getFullYear() +
-        '-' +
-        String(now.getMonth() + 1).padStart(2, '0') +
-        '-' +
-        String(now.getDate()).padStart(2, '0') +
-        ' ' +
-        String(now.getHours()).padStart(2, '0') +
-        ':' +
-        String(now.getMinutes()).padStart(2, '0');
+    // net balance change for this user
+    const netDelta = isWinner ? grossWin - rake : -betBase;
 
-      newHistory.push({
-        id: Date.now() + Math.random(),
-        type: 'bet',
-        amount: displayAmount,
-        currency: 'TON',
-        result: isWinner ? 'win' : 'lose',
-        createdAt,
-        playerName: currentUser.name
-      });
-    }
+    totalDelta += netDelta;
 
+    newHistory.push({
+      id: Date.now() + lobby.id + Math.random(),
+      type: 'bet',
+      amount: Math.abs(netDelta),
+      currency: 'TON',
+      result: isWinner ? 'win' : 'lose',
+      createdAt: new Date().toLocaleString(),
+      playerName: currentUser.name
+    });
+
+    // mark this game as processed
     newProcessed.add(key);
   }
 
   if (totalDelta !== 0 || newHistory.length > 0) {
     setTonBalance(prev => prev + totalDelta);
-    setHistory(prev => [...newHistory, ...prev].slice(0, 30));
-    setProcessedResults(Array.from(newProcessed));
+    setHistory(prev => [...newHistory, ...prev]);
   }
-}, [lobbies, currentUser, processedResults]);
+
+  // store processed keys as string[]
+  setProcessedResults(Array.from(newProcessed));
+}, [lobbies, currentUser, userBets, processedResults]);
     // ---- lobby actions ----
 
   const createLobby = () => {
