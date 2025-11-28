@@ -3,6 +3,7 @@ const router = express.Router();
 
 const { recordBetResult } = require('../walletStore');
 
+// In-memory lobbies
 let lobbies = [];
 let nextLobbyId = 1;
 
@@ -23,28 +24,16 @@ router.post('/create', (req, res) => {
     return res.status(400).json({ error: 'userId and name are required' });
   }
 
-  const numericBet = Number(betAmount);
-  const finalBet = numericBet > 0 ? numericBet : 0.1;
-
   const lobby = {
     id: nextLobbyId++,
+    players: [],            // players join via /:id/join
     status: 'open',
     creatorId: String(userId),
     creatorName: name,
     isPrivate: !!isPrivate,
     pin: isPrivate ? String(pin || '') : null,
-    betAmount: finalBet,
-    gameResult: null,
-
-    // 👇 creator is already a player and already READY
-    players: [
-      {
-        id: String(userId),
-        name,
-        isReady: true,
-        roll: null
-      }
-    ]
+    betAmount: Number(betAmount) > 0 ? Number(betAmount) : 0.1,
+    gameResult: null
   };
 
   lobbies.push(lobby);
@@ -56,131 +45,137 @@ router.post('/:id/join', (req, res) => {
   const id = Number(req.params.id);
   const { userId, name, pin } = req.body;
 
+  if (!userId || !name) {
+    return res.status(400).json({ error: 'userId and name are required' });
+  }
+
   const lobby = lobbies.find(l => l.id === id);
-  if (!lobby) return res.status(404).json({ error: 'Lobby not found' });
+  if (!lobby) {
+    return res.status(404).json({ error: 'Lobby not found' });
+  }
 
   if (lobby.status !== 'open') {
     return res.status(400).json({ error: 'Lobby is not open' });
   }
 
-  if (!userId) {
-    return res.status(400).json({ error: 'userId required' });
-  }
-
   if (lobby.isPrivate) {
     if (!pin || String(pin) !== String(lobby.pin)) {
-      return res.status(403).json({ error: 'Wrong PIN for private lobby' });
+      return res.status(400).json({ error: 'Wrong PIN' });
     }
   }
 
   const userIdStr = String(userId);
 
-  let player = lobby.players.find(p => p.id === userIdStr);
-  if (!player) {
-    player = {
-      id: userIdStr,
-      name: name || 'Player',
-      isReady: false,
-      roll: null,
-    };
-    lobby.players.push(player);
-  } else {
-    // update name if changed
-    if (name && player.name !== name) player.name = name;
+  if (lobby.players.some(p => String(p.id) === userIdStr)) {
+    // already in lobby – just return it
+    return res.json(lobby);
   }
 
-  // if creatorId not set for some reason, set it to first joiner
-  if (!lobby.creatorId) {
-    lobby.creatorId = player.id;
-    lobby.creatorName = player.name;
-  }
+  lobby.players.push({
+    id: userIdStr,
+    name,
+    isReady: false,
+    roll: null
+  });
 
   res.json(lobby);
 });
+
 // POST /api/lobbies/:id/leave
 router.post('/:id/leave', (req, res) => {
   const id = Number(req.params.id);
   const { userId } = req.body;
 
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
   const lobby = lobbies.find(l => l.id === id);
   if (!lobby) {
     return res.status(404).json({ error: 'Lobby not found' });
   }
 
-  if (lobby.status !== 'open') {
-    return res.status(400).json({ error: 'Lobby is not open' });
-  }
-
-  if (String(userId) === lobby.creatorId) {
-    return res
-      .status(400)
-      .json({ error: 'Creator must cancel the lobby instead of leaving' });
-  }
-
-  const before = lobby.players.length;
-  lobby.players = lobby.players.filter(p => p.id !== String(userId));
-
-  if (lobby.players.length === before) {
-    return res.status(400).json({ error: 'User not in lobby' });
-  }
-
-  res.json(lobby);
-});
-
-// POST /api/lobbies/:id/ready  (toggle ready)
-router.post('/:id/ready', (req, res) => {
-  const id = Number(req.params.id);
-  const { userId } = req.body;
-
-  const lobby = lobbies.find(l => l.id === id);
-  if (!lobby) return res.status(404).json({ error: 'Lobby not found' });
-
   const userIdStr = String(userId);
-  const player = lobby.players.find(p => p.id === userIdStr);
-  if (!player) {
-    return res.status(400).json({ error: 'Player not in this lobby' });
+
+  // Creator cannot "leave" – must cancel instead
+  if (userIdStr === String(lobby.creatorId)) {
+    return res.status(400).json({ error: 'Creator cannot leave lobby' });
   }
 
-  player.isReady = !player.isReady;
+  lobby.players = lobby.players.filter(p => String(p.id) !== userIdStr);
+
   res.json(lobby);
 });
+
+// POST /api/lobbies/:id/cancel (creator only)
 router.post('/:id/cancel', (req, res) => {
   const id = Number(req.params.id);
   const { userId } = req.body;
 
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
   const lobby = lobbies.find(l => l.id === id);
   if (!lobby) {
     return res.status(404).json({ error: 'Lobby not found' });
   }
 
-  if (String(userId) !== lobby.creatorId) {
-    return res.status(403).json({ error: 'Only creator can cancel lobby' });
+  if (String(userId) !== String(lobby.creatorId)) {
+    return res.status(403).json({ error: 'Only lobby creator can cancel lobby' });
   }
 
-  if (lobby.status !== 'open') {
-    return res.status(400).json({ error: 'Lobby is not open' });
-  }
+  lobby.status = 'cancelled';
 
-  // remove lobby completely
+  // Frontend already removes it from list, but we also keep our array clean
   lobbies = lobbies.filter(l => l.id !== id);
 
   return res.json({ ok: true });
 });
 
+// POST /api/lobbies/:id/toggle-ready
+router.post('/:id/toggle-ready', (req, res) => {
+  const id = Number(req.params.id);
+  const { userId } = req.body;
 
-// POST /api/lobbies/:id/start
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  const lobby = lobbies.find(l => l.id === id);
+  if (!lobby) {
+    return res.status(404).json({ error: 'Lobby not found' });
+  }
+
+  const userIdStr = String(userId);
+
+  // Creator is not a "player" in this sense – he just starts/cancels
+  if (userIdStr === String(lobby.creatorId)) {
+    return res.status(400).json({ error: 'Creator does not ready up' });
+  }
+
+  const player = lobby.players.find(p => String(p.id) === userIdStr);
+  if (!player) {
+    return res.status(400).json({ error: 'User not in lobby' });
+  }
+
+  player.isReady = !player.isReady;
+
+  res.json(lobby);
+});
+
+// POST /api/lobbies/:id/start  (creator only, auto-reroll on ties)
 router.post('/:id/start', (req, res) => {
   const id = Number(req.params.id);
   const { userId } = req.body;
 
   const lobby = lobbies.find(l => l.id === id);
-  if (!lobby) return res.status(404).json({ error: 'Lobby not found' });
+  if (!lobby) {
+    return res.status(404).json({ error: 'Lobby not found' });
+  }
 
   if (String(userId) !== String(lobby.creatorId)) {
     return res.status(403).json({ error: 'Only lobby creator can start game' });
-  }
-  if (lobby.status !== 'open') {
-    return res.status(400).json({ error: 'Lobby is not open' });
   }
 
   const readyPlayers = lobby.players.filter(p => p.isReady);
@@ -190,73 +185,86 @@ router.post('/:id/start', (req, res) => {
       .json({ error: 'Need at least 2 ready players to start' });
   }
 
-  // --- AUTO REROLL LOGIC ---
-  let currentRound = readyPlayers.map(p => ({
+  const bet = lobby.betAmount || 0.1;
+
+  // We keep a log of all rounds (for rerolls display)
+  const rounds = [];
+
+  // Contenders in current round: subset of ready players
+  let contenders = readyPlayers.map(p => ({
     id: p.id,
     name: p.name
   }));
 
-  const roundsLog = [];
+  let finalWinner = null;
+  let finalHighest = 0;
+  const finalRollsById = {}; // id -> roll in the deciding round
 
   while (true) {
-    // roll for this round
-    const rolls = currentRound.map(p => ({
-      id: p.id,
-      name: p.name,
-      roll: rollDie()
-    }));
+    // Roll for each contender in this round
+    contenders.forEach(p => {
+      p.roll = rollDie();
+    });
 
-    roundsLog.push(rolls);
+    // Save this round for UI (id, name, roll)
+    rounds.push(
+      contenders.map(p => ({
+        id: p.id,
+        name: p.name,
+        roll: p.roll
+      }))
+    );
 
-    const highest = Math.max(...rolls.map(r => r.roll));
+    const highest = Math.max(...contenders.map(p => p.roll));
+    const highestPlayers = contenders.filter(p => p.roll === highest);
 
-    const top = rolls.filter(r => r.roll === highest);
-
-    if (top.length === 1) {
-      // final winner
-      const winner = top[0];
-
-      const bet = lobby.betAmount ?? 0.1;
-      const nPlayers = readyPlayers.length;
-
-      // total pot
-      const totalPot = bet * nPlayers;
-
-      // house rake 5% of total pot
-      const rake = totalPot * 0.05;
-
-      // gross win before rake
-      const grossWin = totalPot - bet;
-
-      const netWin = grossWin - rake;
-
-      // record results in wallet
-      readyPlayers.forEach(p => {
-        if (p.id === winner.id) {
-          recordBetResult(p.id, p.name, netWin, 'win');
-        } else {
-          recordBetResult(p.id, p.name, bet, 'lose');
-        }
+    if (highestPlayers.length === 1) {
+      // Unique winner found
+      finalWinner = highestPlayers[0];
+      finalHighest = highest;
+      highestPlayers.forEach(p => {
+        finalRollsById[p.id] = p.roll;
       });
-
-      lobby.status = 'finished';
-      lobby.gameResult = {
-        winnerId: winner.id,
-        winnerName: winner.name,
-        highest,
-        players: rolls,      // final round only
-        rounds: roundsLog    // all rounds including tie-breakers
-      };
-
-      return res.json(lobby);
+      break;
     }
 
-    // tie → reroll ONLY the tied players
-    currentRound = top.map(t => ({ id: t.id, name: t.name }));
+    // Tie – next round with only the tied players
+    contenders = highestPlayers.map(p => ({
+      id: p.id,
+      name: p.name
+    }));
   }
-});
 
+  // Payout: winner gets all others' bets (we assume individual bet = lobby.betAmount)
+  const n = readyPlayers.length;
+  const winnerProfit = bet * (n - 1);
+
+  readyPlayers.forEach(p => {
+    if (String(p.id) === String(finalWinner.id)) {
+      recordBetResult(p.id, p.name, winnerProfit, 'win');
+    } else {
+      // losers lose their bet
+      recordBetResult(p.id, p.name, bet, 'lose');
+    }
+  });
+
+  // Update lobby
   lobby.status = 'finished';
+  lobby.gameResult = {
+    winnerId: finalWinner.id,
+    winnerName: finalWinner.name,
+    highest: finalHighest,
+    players: readyPlayers.map(p => ({
+      id: p.id,
+      name: p.name,
+      // use the deciding round roll if we have it, otherwise 0
+      roll:
+        finalRollsById[String(p.id)] !== undefined
+          ? finalRollsById[String(p.id)]
+          : 0
+    })),
+    rounds
+  };
 
   res.json(lobby);
 });
