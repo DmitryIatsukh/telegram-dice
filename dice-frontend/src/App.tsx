@@ -539,7 +539,6 @@ const cancelLobby = (id: number) => {
       ? lobbies.find(l => l.id === selectedLobbyId) || null
       : null
   
-  const selectedGameResult = selectedLobby?.gameResult ?? null;
   const meInSelectedLobby =
     currentUser && selectedLobby
       ? selectedLobby.players.find(p => p.id === currentUser.id)
@@ -548,16 +547,6 @@ const cancelLobby = (id: number) => {
 const isMeInLobby = !!meInSelectedLobby
   const isMeCreator =
     !!currentUser && !!selectedLobby && currentUser.id === selectedLobby.creatorId
-// backwards-compat for older JSX names
-const isUserInSelectedLobby = isMeInLobby
-const isUserReadyInSelectedLobby = isMeReady
-const isCreatorInSelectedLobby = isMeCreator
-const gameFinished = selectedLobby?.status === 'finished';
-  const closePopup = () => {
-  setSelectedLobbyId(null)
-  setJoinPin('')
-  setCurrentPage('lobbies')
-}
 
   // ---- TonConnect: deposit / withdraw ----
 
