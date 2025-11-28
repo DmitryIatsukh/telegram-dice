@@ -531,6 +531,8 @@ const cancelLobby = (id: number) => {
     selectedLobbyId != null
       ? lobbies.find(l => l.id === selectedLobbyId) || null
       : null
+  
+  const selectedGameResult = selectedLobby?.gameResult ?? null;
   const meInSelectedLobby =
     currentUser && selectedLobby
       ? selectedLobby.players.find(p => p.id === currentUser.id)
@@ -1824,25 +1826,39 @@ paddingBottom: 100,
               </div>
             </div>
 
-            {selectedLobby.gameResult && (
-              <div style={{ marginTop: 14 }}>
-                <h4>Game Result:</h4>
-                <p>
-                  Winner: {selectedLobby.gameResult.winnerName} (roll{' '}
-                  {selectedLobby.gameResult.highest})
-                </p>
-                <ul>
-                  {selectedLobby.gameResult.players.map(p => (
-                    <li key={p.id}>
-                      {p.name}: rolled {p.roll}
-                    </li>
-                  ))}
-                </ul>
+            {selectedGameResult && (
+  <div style={{ marginTop: 14 }}>
+    <h4>Game Result:</h4>
+    <p>
+      Winner: {selectedGameResult.winnerName} (roll {selectedGameResult.highest})
+    </p>
+
+    <ul>
+      {selectedGameResult.players.map(p => (
+        <li key={p.id}>
+          {p.name}: rolled {p.roll}
+        </li>
+      ))}
+    </ul>
+
+    {/* Show all rounds including tie-breakers, if we have them */}
+    {Array.isArray((selectedGameResult as any).rounds) &&
+      (selectedGameResult as any).rounds.length > 1 && (
+        <div style={{ marginTop: 8, fontSize: 12, color: '#ccc' }}>
+          <div>Rounds (including rerolls):</div>
+          {(selectedGameResult as any).rounds.map(
+            (round: { id: string; name: string; roll: number }[], idx: number) => (
+              <div key={idx}>
+                Round {idx + 1}:{' '}
+                {round.map(r => `${r.name} (${r.roll})`).join(', ')}
               </div>
-            )}
-          </div>
+            )
+          )}
         </div>
       )}
+  </div>
+)}
+
 {selectedLobby.gameResult.rounds && (
   <div style={{ marginTop: 10, fontSize: 12 }}>
     <h4>Roll log:</h4>
