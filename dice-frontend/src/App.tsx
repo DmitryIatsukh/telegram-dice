@@ -78,7 +78,7 @@ function DiceApp() {
   const [selectedLobbyId, setSelectedLobbyId] = useState<number | null>(null)
 
   const [createMode, setCreateMode] = useState<'public' | 'private'>('public')
-const [newLobbySize setNewLobbySize] = useState<2 | 4>(4)
+const [newLobbySize, setNewLobbySize] = useState<2 | 4>(4);
   const [createPin, setCreatePin] = useState('')
   const [joinPin, setJoinPin] = useState('')
 // --- bet amount when creating a new lobby ---
@@ -343,13 +343,18 @@ useEffect(() => {
   fetch(`${API}/lobbies/create`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+        body: JSON.stringify({
       userId: currentUser.id,
       name: currentUser.username || currentUser.name,
       isPrivate: createMode === 'private',
       pin: createMode === 'private' ? createPin : undefined,
-      betAmount: betToSend,     
-maxPlayers: newLobbySize        // 👈 NEW
+
+      // send all possible bet fields so backend is happy
+      betAmount: betToSend,
+      baseBet: betToSend,
+      bet: betToSend,
+
+      maxPlayers: newLobbySize,
     }),
   })
     .then(async (res) => {
@@ -1702,7 +1707,18 @@ const shortAddress =
       ))}
     </>
   )
+  // ---- banner info (derived from history) ----
+  const lastBetItem = [...history]
+    .slice()
+    .reverse()
+    .find(h => h.type === 'bet')
 
+  const biggestWinItem = history
+    .filter(h => h.type === 'bet' && h.result === 'win')
+    .reduce<HistoryItem | null>((max, item) => {
+      if (!max) return item
+      return item.amount > max.amount ? item : max
+    }, null)
   // ---- main frame ----
 
   return (
@@ -1742,53 +1758,55 @@ const shortAddress =
         </div>
       </div>
 
-      {/* ---- GLOBAL WIN BANNER ---- */}
-{(() => {
-  // Find the latest finished game in all lobbies
-  const finished = lobbies
-    .filter(l => l.status === 'finished' && l.gameResult)
-    .sort((a, b) => b.id - a.id);
+           {/* Top banner: last bet & biggest win */}
+      {(lastBetItem || biggestWinItem) && (
+        <div
+          style={{
+            marginBottom: 14,
+            padding: 10,
+            borderRadius: 14,
+            background:
+              'linear-gradient(135deg, rgba(0,40,100,0.95), rgba(60,10,90,0.98))',
+            border: '1px solid rgba(255,255,255,0.12)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            boxShadow: '0 0 18px rgba(255,0,128,0.4)',
+            fontSize: 12,
+          }}
+        >
+          {lastBetItem && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <span style={{ opacity: 0.8 }}>Last game:</span>
+              <span>
+                {lastBetItem.result === 'win' ? 'You won' : 'You lost'}{' '}
+                <b>{lastBetItem.amount.toFixed(2)} TON</b>
+              </span>
+            </div>
+          )}
 
-  if (finished.length === 0) return null;
-
-  const latest = finished[0].gameResult;
-  if (!latest) return null;
-
-  // Biggest win ever (based on pot size)
-  const biggest = finished.reduce((best, l) => {
-    const res = l.gameResult;
-    if (!res) return best;
-    const pot = (l.betAmount ?? 1) * (l.players.length || 1);
-    return pot > best.pot ? { pot, res, lobby: l } : best;
-  }, { pot: 0, res: null as GameResult | null, lobby: null as Lobby | null });
-
-  return (
-    <div
-      style={{
-        background:
-          'linear-gradient(135deg, rgba(0,40,80,0.9), rgba(0,10,25,0.95))',
-        borderRadius: 12,
-        padding: 12,
-        margin: '6px 0 16px',
-        border: '1px solid rgba(0,180,255,0.3)',
-        boxShadow: '0 0 14px rgba(0,150,255,0.25)',
-      }}
-    >
-      {/* Latest win */}
-      <div style={{ fontSize: 13, marginBottom: 6 }}>
-        🏆 <b>{latest.winnerName}</b> won with <b>{latest.highest}</b> 🎲
-      </div>
-
-      {/* Biggest win ever */}
-      {biggest.res && (
-        <div style={{ fontSize: 12, opacity: 0.85 }}>
-          💰 Highest win ever: <b>{biggest.res!.winnerName}</b>{' '}
-          (Lobby #{biggest.lobby!.id})
+          {biggestWinItem && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <span style={{ opacity: 0.8 }}>Biggest win:</span>
+              <span>
+                <b>{biggestWinItem.amount.toFixed(2)} TON</b>
+              </span>
+            </div>
+          )}
         </div>
       )}
-    </div>
-  );
-})()}
 
       {/* Pages */}
       {currentPage === 'lobbies' && renderLobbiesPage()}
