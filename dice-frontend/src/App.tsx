@@ -1077,7 +1077,7 @@ const shortAddress =
                       cursor: isDepositing ? 'wait' : 'pointer',
                       whiteSpace: 'nowrap',
                       opacity: isDepositing ? 0.6 : 1,
-                      width: 120,
+                       width: 'auto',   
                       textAlign: 'center'
                     }}
                   >
@@ -1095,7 +1095,7 @@ const shortAddress =
                   style={{
                     display: 'flex',
                     gap: 6,
-                    flexWrap: 'nowrap',
+                    flexWrap: 'wrap',
                     alignItems: 'center'
                   }}
                 >
@@ -1104,8 +1104,8 @@ const shortAddress =
                     value={withdrawAmount}
                     onChange={e => setWithdrawAmount(e.target.value)}
                     style={{
-                      flex: 1,
-                      minWidth: 0,
+                      flex: '1 1 130px',
+    minWidth: 130,
                       padding: '4px 8px',
                       borderRadius: 6,
                       border: '1px solid #555',
@@ -1129,7 +1129,7 @@ const shortAddress =
                       cursor: isWithdrawing ? 'wait' : 'pointer',
                       whiteSpace: 'nowrap',
                       opacity: isWithdrawing ? 0.6 : 1,
-                      width: 120,
+                      width: 'auto', 
                       textAlign: 'center'
                     }}
                   >
@@ -1292,49 +1292,32 @@ const shortAddress =
           paddingBottom: 40,
         }}
       >
-        {/* HEADER */}
         <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 8,
-          }}
-        >
-          <h3>
-            Lobby #{selectedLobby.id}{' '}
-            {selectedLobby.isPrivate && (
-              <span
-                style={{
-                  fontSize: 11,
-                  background:
-                    'linear-gradient(135deg, #ff4d6a 0%, #ff9a9e 100%)',
-                  padding: '2px 8px',
-                  borderRadius: 999,
-                  marginLeft: 6,
-                  color: '#111',
-                }}
-              >
-                Private
-              </span>
-            )}
-          </h3>
-          <button
-            onClick={() => {
-              setSelectedLobbyId(null)
-              setCurrentPage('lobbies')
-            }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#fff',
-              fontSize: 18,
-              cursor: 'pointer',
-            }}
-          >
-            ✕
-          </button>
-        </div>
+  style={{
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: 8,
+  }}
+>
+  <h3>
+    Lobby #{selectedLobby.id}{' '}
+    {selectedLobby.isPrivate && (
+      <span
+        style={{
+          fontSize: 11,
+          background:
+            'linear-gradient(135deg, #ff4d6a 0%, #ff9a9e 100%)',
+          padding: '2px 8px',
+          borderRadius: 999,
+          marginLeft: 6,
+          color: '#111',
+        }}
+      >
+        Private
+      </span>
+    )}
+  </h3>
+</div>
 
         {/* INFO */}
         <p style={{ fontSize: 13, color: '#ccc' }}>
@@ -1812,18 +1795,41 @@ const shortAddress =
       ))}
     </>
   )
-  // ---- banner info (derived from history) ----
-  const lastBetItem = [...history]
-    .slice()
-    .reverse()
-    .find(h => h.type === 'bet')
+  // ---- banner info: GLOBAL wins from all finished lobbies ----
+const finishedLobbies = lobbies.filter(
+  l =>
+    l.status === 'finished' &&
+    l.gameResult &&
+    Array.isArray(l.gameResult.players) &&
+    l.gameResult.players.length > 1
+);
 
-  const biggestWinItem = history
-    .filter(h => h.type === 'bet' && h.result === 'win')
-    .reduce<HistoryItem | null>((max, item) => {
-      if (!max) return item
-      return item.amount > max.amount ? item : max
-    }, null)
+// last finished lobby = last win
+const lastFinishedLobby =
+  finishedLobbies.length > 0
+    ? finishedLobbies[finishedLobbies.length - 1]
+    : null;
+
+const lastGlobalWin = lastFinishedLobby
+  ? {
+      winnerName: lastFinishedLobby.gameResult!.winnerName,
+      amount:
+        (lastFinishedLobby.betAmount ?? 1) *
+        (lastFinishedLobby.gameResult!.players.length - 1),
+    }
+  : null;
+
+// biggest win across all finished lobbies
+const biggestGlobalWin = finishedLobbies.reduce<
+  { winnerName: string; amount: number } | null
+>((max, lobby) => {
+  const gr = lobby.gameResult!;
+  const amount = (lobby.betAmount ?? 1) * (gr.players.length - 1);
+  if (!max || amount > max.amount) {
+    return { winnerName: gr.winnerName, amount };
+  }
+  return max;
+}, null);
   // ---- main frame ----
 
   return (
@@ -1863,55 +1869,56 @@ const shortAddress =
         </div>
       </div>
 
-           {/* Top banner: last bet & biggest win */}
-      {(lastBetItem || biggestWinItem) && (
-        <div
-          style={{
-            marginBottom: 14,
-            padding: 10,
-            borderRadius: 14,
-            background:
-              'linear-gradient(135deg, rgba(0,40,100,0.95), rgba(60,10,90,0.98))',
-            border: '1px solid rgba(255,255,255,0.12)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 6,
-            boxShadow: '0 0 18px rgba(255,0,128,0.4)',
-            fontSize: 12,
-          }}
-        >
-          {lastBetItem && (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <span style={{ opacity: 0.8 }}>Last game:</span>
-              <span>
-                {lastBetItem.result === 'win' ? 'You won' : 'You lost'}{' '}
-                <b>{lastBetItem.amount.toFixed(2)} TON</b>
-              </span>
-            </div>
-          )}
+        {/* Top banner: GLOBAL last win & biggest win */}
+{(lastGlobalWin || biggestGlobalWin) && (
+  <div
+    style={{
+      marginBottom: 14,
+      padding: 10,
+      borderRadius: 14,
+      background:
+        'linear-gradient(135deg, rgba(0,40,100,0.95), rgba(60,10,90,0.98))',
+      border: '1px solid rgba(255,255,255,0.12)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 6,
+      boxShadow: '0 0 18px rgba(255,0,128,0.4)',
+      fontSize: 12,
+    }}
+  >
+    {lastGlobalWin && (
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <span style={{ opacity: 0.8 }}>Last win:</span>
+        <span>
+          🎉 <b>{lastGlobalWin.winnerName}</b> won{' '}
+          <b>{lastGlobalWin.amount.toFixed(2)} TON</b>
+        </span>
+      </div>
+    )}
 
-          {biggestWinItem && (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <span style={{ opacity: 0.8 }}>Biggest win:</span>
-              <span>
-                <b>{biggestWinItem.amount.toFixed(2)} TON</b>
-              </span>
-            </div>
-          )}
-        </div>
-      )}
+    {biggestGlobalWin && (
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <span style={{ opacity: 0.8 }}>Biggest win:</span>
+        <span>
+          👑 <b>{biggestGlobalWin.winnerName}</b> won{' '}
+          <b>{biggestGlobalWin.amount.toFixed(2)} TON</b>
+        </span>
+      </div>
+    )}
+  </div>
+)}
 
       {/* Pages */}
       {currentPage === 'lobbies' && renderLobbiesPage()}
