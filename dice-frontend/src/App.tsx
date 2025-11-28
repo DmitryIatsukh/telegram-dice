@@ -1040,28 +1040,28 @@ const shortAddress =
                   💰 Deposit (TonConnect)
                 </div>
                 <div
-                  style={{
-                    display: 'flex',
-                    gap: 6,
-                    flexWrap: 'nowrap',
-                    alignItems: 'center'
-                  }}
-                >
+  style={{
+    display: 'flex',
+    gap: 6,
+    flexWrap: 'wrap',      // allow wrapping on small screens
+    alignItems: 'center'
+  }}
+>
                   <input
                     placeholder="Amount"
                     value={depositAmount}
                     onChange={e => setDepositAmount(e.target.value)}
                     style={{
-                      flex: 1,
-                      minWidth: 0,
-                      padding: '4px 8px',
-                      borderRadius: 6,
-                      border: '1px solid #555',
-                      background: '#050511',
-                      color: '#fff',
-                      fontSize: 12
-                    }}
-                  />
+    flex: '1 1 130px',
+    minWidth: 130,
+    padding: '4px 8px',
+    borderRadius: 6,
+    border: '1px solid #555',
+    background: '#050511',
+    color: '#fff',
+    fontSize: 12
+  }}
+/>
                   <button
                     onClick={handleDeposit}
                     disabled={isDepositing}
