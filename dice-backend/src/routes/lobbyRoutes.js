@@ -178,12 +178,29 @@ router.post('/:id/start', (req, res) => {
     return res.status(403).json({ error: 'Only lobby creator can start game' });
   }
 
-  const readyPlayers = lobby.players.filter(p => p.isReady);
-  if (readyPlayers.length < 2) {
-    return res
-      .status(400)
-      .json({ error: 'Need at least 2 ready players to start' });
-  }
+  // Include creator as "ready"
+const creatorIsPlayer = {
+  id: lobby.creatorId,
+  name: lobby.creatorName,
+  isReady: true
+};
+
+// All players except creator
+const nonCreatorPlayers = lobby.players.filter(p => p.id !== lobby.creatorId);
+
+// Real ready players are creator + all ready users
+const readyPlayers = [
+  creatorIsPlayer,
+  ...nonCreatorPlayers.filter(p => p.isReady)
+];
+
+// Require creator + at least 1 more
+if (readyPlayers.length < 2) {
+  return res.status(400).json({
+    error: 'Need creator + at least 1 ready player to start'
+  });
+}
+
 
   const bet = lobby.betAmount || 0.1;
 
