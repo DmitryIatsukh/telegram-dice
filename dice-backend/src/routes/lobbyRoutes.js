@@ -16,29 +16,53 @@ router.get('/', (req, res) => {
   res.json(lobbies);
 });
 
+// in memory lobby store
+let nextLobbyId = 1;
+const lobbies = [];
+
 // POST /api/lobbies/create
-router.post('/create', (req, res) => {
-  const { userId, name, isPrivate, pin, betAmount } = req.body;
+app.post('/api/lobbies/create', (req, res) => {
+  try {
+    const {
+      userId,
+      name,
+      isPrivate,
+      pin,
+      betAmount,
+      maxPlayers,
+    } = req.body || {};
 
-  if (!userId || !name) {
-    return res.status(400).json({ error: 'userId and name are required' });
+    if (!userId || !name) {
+      return res.status(400).json({ error: 'Missing userId or name' });
+    }
+
+    if (isPrivate && (!pin || String(pin).length !== 4)) {
+      return res.status(400).json({ error: 'PIN must be 4 digits' });
+    }
+
+    const finalBet =
+      typeof betAmount === 'number' && betAmount > 0 ? betAmount : 1;
+
+    const finalMaxPlayers = maxPlayers === 2 ? 2 : 4;
+
+    const newLobby = {
+      id: nextLobbyId++,
+      players: [],                 // no players yet – creator auto-joins from frontend
+      status: 'open',
+      creatorId: null,
+      creatorName: null,
+      isPrivate: !!isPrivate,
+      betAmount: finalBet,
+      maxPlayers: finalMaxPlayers,
+      gameResult: null,
+    };
+
+    lobbies.push(newLobby);
+    return res.json(newLobby);
+  } catch (err) {
+    console.error('create lobby error', err);
+    return res.status(500).json({ error: 'Internal server error' });
   }
-
-  const lobby = {
-    id: nextLobbyId++,
-    players: [],            // players join via /:id/join
-    status: 'open',
-    creatorId: String(userId),
-    creatorName: name,
-    isPrivate: !!isPrivate,
-    pin: isPrivate ? String(pin || '') : null,
-    betAmount: Number(betAmount) > 0 ? Number(betAmount) : 0.1,
-    maxPlayers: maxPlayers === 2 ? 2 : 4,
-    gameResult: null
-  };
-
-  lobbies.push(lobby);
-  res.json(lobby);
 });
 
 // POST /api/lobbies/:id/join
