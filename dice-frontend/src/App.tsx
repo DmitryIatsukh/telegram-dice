@@ -324,11 +324,13 @@ useEffect(() => {
 
   const createLobby = () => {
   if (!currentUser) return
+
   if (newLobbyBet <= 0) {
     setErrorMessage('Bet must be greater than 0')
     return
   }
 
+  // (optional) balance check – keep or remove as you prefer
   if (newLobbyBet > tonBalance) {
     setErrorMessage("You don't have enough balance for this bet")
     return
@@ -338,53 +340,54 @@ useEffect(() => {
     setErrorMessage('Private lobby needs a 4-digit PIN')
     return
   }
-// Enforce minimum bet 0.1 TON logically (not in the input)
+
+  // Enforce minimum bet 0.1 TON logically
   const betToSend = newLobbyBet >= 0.1 ? newLobbyBet : 0.1
+
   fetch(`${API}/lobbies/create`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+    body: JSON.stringify({
       userId: currentUser.id,
       name: currentUser.username || currentUser.name,
       isPrivate: createMode === 'private',
       pin: createMode === 'private' ? createPin : undefined,
 
-      // send all possible bet fields so backend is happy
+      // these two are what the backend should care about
       betAmount: betToSend,
-      baseBet: betToSend,
-      bet: betToSend,
-
       maxPlayers: newLobbySize,
     }),
   })
-    .then(async (res) => {
+    .then(async res => {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        setErrorMessage(err.error || 'Error creating lobby')
+        console.log('createLobby error', res.status, err)
+        setErrorMessage(
+          err.error || `Error creating lobby (code ${res.status})`
+        )
         return null
       }
       return res.json()
     })
-      .then(async (lobby: Lobby | null) => {
-    if (!lobby) return
+    .then((lobby: Lobby | null) => {
+      if (!lobby) return
 
-    // add lobby to list and open it
-    setLobbies(prev => [...prev, lobby])
-    setSelectedLobbyId(lobby.id)
-    setCreatePin('')
+      // add lobby and open game page
+      setLobbies(prev => [...prev, lobby])
+      setSelectedLobbyId(lobby.id)
+      setCreatePin('')
       setCurrentPage('game')
 
-    // ⭐ Auto-join + auto-ready creator
-    // Auto-join lobby creator with 150ms delay to ensure lobby exists
-if (currentUser) {
-  setTimeout(() => {
-    joinLobby(
-      lobby.id,
-      createMode === 'private' ? createPin : undefined
-    )
-  }, 150);
-}
-  })
+      // auto-join creator
+      if (currentUser) {
+        setTimeout(() => {
+          joinLobby(
+            lobby.id,
+            createMode === 'private' ? createPin : undefined
+          )
+        }, 150)
+      }
+    })
 }
 
   const joinLobby = (id: number, pin?: string) => {
