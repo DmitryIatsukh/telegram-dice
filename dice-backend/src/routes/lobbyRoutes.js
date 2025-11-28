@@ -33,6 +33,7 @@ router.post('/create', (req, res) => {
     isPrivate: !!isPrivate,
     pin: isPrivate ? String(pin || '') : null,
     betAmount: Number(betAmount) > 0 ? Number(betAmount) : 0.1,
+    maxPlayers: maxPlayers === 2 ? 2 : 4,
     gameResult: null
   };
 
@@ -56,6 +57,10 @@ router.post('/:id/join', (req, res) => {
 
   if (lobby.status !== 'open') {
     return res.status(400).json({ error: 'Lobby is not open' });
+  }
+  // 👇 NEW: full lobby check
+  if (lobby.maxPlayers && lobby.players.length >= lobby.maxPlayers) {
+    return res.status(400).json({ error: 'Lobby is full' });
   }
 
   if (lobby.isPrivate) {
