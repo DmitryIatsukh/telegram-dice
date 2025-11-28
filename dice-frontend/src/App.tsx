@@ -24,6 +24,7 @@ type GameResult = {
   winnerName: string
   highest: number
   players: { id: string; name: string; roll: number }[]
+  rounds?: { id: string; name: string; roll: number }[][]
 } | null
 
 type Lobby = {
