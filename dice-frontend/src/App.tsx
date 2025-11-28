@@ -547,6 +547,7 @@ const isMeInLobby = !!meInSelectedLobby
 const isUserInSelectedLobby = isMeInLobby
 const isUserReadyInSelectedLobby = isMeReady
 const isCreatorInSelectedLobby = isMeCreator
+const gameFinished = selectedLobby?.status === 'finished';
   const closePopup = () => {
     setSelectedLobbyId(null)
     setJoinPin('')
@@ -1607,13 +1608,17 @@ paddingBottom: 100,
               Bet: {(selectedLobby.betAmount ?? 1).toFixed(2)} TON
             </p>
             <p style={{ marginTop: 10, fontSize: 13 }}>
-              Players:{' '}
-              {selectedLobby.players.length === 0
-                ? 'none'
-                : selectedLobby.players
-                    .map(p => `${p.name} (${p.isReady ? 'ready' : 'not ready'})`)
-                    .join(', ')}
-            </p>
+  Players:{' '}
+  {[
+    // show creator WITHOUT ready/not ready
+    `${selectedLobby.creatorName} (creator)`,
+
+    // show all players EXCEPT creator WITH ready/not ready
+    ...selectedLobby.players
+      .filter(p => p.id !== selectedLobby.creatorId)
+      .map(p => `${p.name} (${p.isReady ? 'ready' : 'not ready'})`)
+  ].join(', ')}
+</p>
             <p style={{ fontSize: 13, color: '#ccc', marginTop: 6 }}>
               Bet per player:{' '}
               {typeof selectedLobby.betAmount === 'number'
@@ -1653,181 +1658,122 @@ paddingBottom: 100,
                 </div>
               )}
 
-              {/* BET INPUT + QUICK ADD */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 13 }}>Your bet (TON):</span>
-                <input
-                  type="text"
-                  value={
-                    userBets[selectedLobby.id] !== undefined
-                      ? userBets[selectedLobby.id].toString()
-                      : selectedLobby.betAmount != null
-                      ? selectedLobby.betAmount.toString()
-                      : ''
-                  }
-                  onChange={e => {
-                    const raw = e.target.value.replace(/[^0-9.]/g, '')
-                    const parsed = parseFloat(raw)
-                    setUserBets(prev => ({
-                      ...prev,
-                      [selectedLobby.id]: isNaN(parsed) ? 0 : parsed
-                    }))
-                  }}
-                  style={{
-                    padding: '4px 8px',
-                    borderRadius: 6,
-                    border: '1px solid #555',
-                    background: '#050511',
-                    color: '#fff',
-                    width: 100
-                  }}
-                />
-                <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
-                  {[0.1, 0.5, 1].map(val => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() =>
-                        setUserBets(prev => {
-                          const current = prev[selectedLobby.id] || 0
-                          const updated =
-                            Math.round((current + val) * 100) / 100
-                          return { ...prev, [selectedLobby.id]: updated }
-                        })
-                      }
-                      style={{
-                        padding: '2px 6px',
-                        borderRadius: 999,
-                        border: 'none',
-                        background:
-                          'linear-gradient(135deg, #ff0080 0%, #ff8c00 60%, #ffe53b 100%)',
-                        color: '#111',
-                        fontSize: 11,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 3
-                      }}
-                    >
-                      <span>🎰</span>
-                      <span>+{val}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {/* Bet is fixed -- show only */}
+<div style={{ fontSize: 13, marginTop: 8 }}>
+  Bet per player: {selectedLobby.betAmount?.toFixed(2)} TON
+</div>
+{!gameFinished && (
+  <div
+    // ACTION BUTTONS ROW
+    style={{
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginTop: 8
+    }}
+  >
+    {/* JOIN / LEAVE – only for non-creator */}
+    {!isCreatorInSelectedLobby && (
+      <button
+        onClick={() =>
+          isUserInSelectedLobby
+            ? leaveLobby(selectedLobby.id)
+            : joinLobby(
+                selectedLobby.id,
+                selectedLobby.isPrivate ? joinPin : undefined
+              )
+        }
+        style={{
+          padding: '8px 16px',
+          minWidth: 120,
+          borderRadius: 999,
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: 13,
+          fontWeight: 600,
+          background: isUserInSelectedLobby
+            ? 'linear-gradient(135deg, #f97316 0%, #fb7185 50%, #fee2e2 100%)'
+            : 'linear-gradient(135deg, #00d4ff 0%, #0074ff 60%, #4a00e0 100%)',
+          color: isUserInSelectedLobby ? '#111827' : '#fff',
+          boxShadow: '0 0 12px rgba(0,0,0,0.4)',
+          textAlign: 'center'
+        }}
+      >
+        {isUserInSelectedLobby ? 'Leave lobby' : 'Join lobby'}
+      </button>
+    )}
 
-              {/* ACTION BUTTONS ROW */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: 8,
-                  marginTop: 8
-                }}
-              >
-                {/* JOIN / LEAVE – only for non-creator */}
-                {!isCreatorInSelectedLobby && (
-                  <button
-                    onClick={() =>
-                      isUserInSelectedLobby
-                        ? leaveLobby(selectedLobby.id)
-                        : joinLobby(
-                            selectedLobby.id,
-                            selectedLobby.isPrivate ? joinPin : undefined
-                          )
-                    }
-                    style={{
-                      padding: '8px 16px',
-                      minWidth: 120,
-                      borderRadius: 999,
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      background: isUserInSelectedLobby
-                        ? 'linear-gradient(135deg, #f97316 0%, #fb7185 50%, #fee2e2 100%)'
-                        : 'linear-gradient(135deg, #00d4ff 0%, #0074ff 60%, #4a00e0 100%)',
-                      color: isUserInSelectedLobby ? '#111827' : '#fff',
-                      boxShadow: '0 0 12px rgba(0,0,0,0.4)',
-                      textAlign: 'center'
-                    }}
-                  >
-                    {isUserInSelectedLobby ? 'Leave lobby' : 'Join lobby'}
-                  </button>
-                )}
+    {/* READY SWITCH – only for players in lobby, not creator */}
+    {!isCreatorInSelectedLobby && isUserInSelectedLobby && (
+      <button
+        onClick={() => toggleReady(selectedLobby.id)}
+        style={{
+          padding: '8px 16px',
+          minWidth: 120,
+          borderRadius: 999,
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: 13,
+          fontWeight: 600,
+          background: isUserReadyInSelectedLobby
+            ? 'linear-gradient(135deg, #22c55e 0%, #4ade80 50%, #bbf7d0 100%)'
+            : 'linear-gradient(135deg, #f97316 0%, #fb7185 50%, #fee2e2 100%)',
+          color: isUserReadyInSelectedLobby ? '#022c22' : '#111827',
+          boxShadow: '0 0 12px rgba(0,0,0,0.4)',
+          textAlign: 'center'
+        }}
+      >
+        {isUserReadyInSelectedLobby ? 'Unready' : 'Ready'}
+      </button>
+    )}
 
-                {/* READY SWITCH – only for players in lobby, not creator */}
-                {!isCreatorInSelectedLobby && isUserInSelectedLobby && (
-                  <button
-                    onClick={() => toggleReady(selectedLobby.id)}
-                    style={{
-                      padding: '8px 16px',
-                      minWidth: 120,
-                      borderRadius: 999,
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      background: isUserReadyInSelectedLobby
-                        ? 'linear-gradient(135deg, #22c55e 0%, #4ade80 50%, #bbf7d0 100%)'
-                        : 'linear-gradient(135deg, #f97316 0%, #fb7185 50%, #fee2e2 100%)',
-                      color: isUserReadyInSelectedLobby ? '#022c22' : '#111827',
-                      boxShadow: '0 0 12px rgba(0,0,0,0.4)',
-                      textAlign: 'center'
-                    }}
-                  >
-                    {isUserReadyInSelectedLobby ? 'Unready' : 'Ready'}
-                  </button>
-                )}
+    {/* START GAME – only creator */}
+    {isCreatorInSelectedLobby && (
+      <button
+        onClick={() => startGame(selectedLobby.id)}
+        style={{
+          padding: '8px 16px',
+          minWidth: 120,
+          borderRadius: 999,
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: 13,
+          fontWeight: 600,
+          background:
+            'linear-gradient(135deg, #22c55e 0%, #4ade80 50%, #bbf7d0 100%)',
+          color: '#022c22',
+          boxShadow: '0 0 12px rgba(0,0,0,0.4)',
+          textAlign: 'center'
+        }}
+      >
+        Start game
+      </button>
+    )}
 
-                {/* START GAME – only creator */}
-                {isCreatorInSelectedLobby && (
-                  <button
-                    onClick={() => startGame(selectedLobby.id)}
-                    style={{
-                      padding: '8px 16px',
-                      minWidth: 120,
-                      borderRadius: 999,
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      background:
-                        'linear-gradient(135deg, #22c55e 0%, #4ade80 50%, #bbf7d0 100%)',
-                      color: '#022c22',
-                      boxShadow: '0 0 12px rgba(0,0,0,0.4)',
-                      textAlign: 'center'
-                    }}
-                  >
-                    Start game
-                  </button>
-                )}
-
-                {/* CANCEL LOBBY – only creator */}
-                {isCreatorInSelectedLobby && (
-                  <button
-                    onClick={() => cancelLobby(selectedLobby.id)}
-                    style={{
-                      padding: '8px 16px',
-                      minWidth: 120,
-                      borderRadius: 999,
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      background:
-                        'linear-gradient(135deg, #ff4d6a 0%, #ff0000 40%, #8b0000 100%)',
-                      color: '#fff',
-                      boxShadow: '0 0 12px rgba(0,0,0,0.4)',
-                      textAlign: 'center'
-                    }}
-                  >
-                    Cancel lobby
-                  </button>
-                )}
-              </div>
-            </div>
-
+    {/* CANCEL LOBBY – only creator */}
+    {isCreatorInSelectedLobby && (
+      <button
+        onClick={() => cancelLobby(selectedLobby.id)}
+        style={{
+          padding: '8px 16px',
+          minWidth: 120,
+          borderRadius: 999,
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: 13,
+          fontWeight: 600,
+          background:
+            'linear-gradient(135deg, #ff4d6a 0%, #ff0000 40%, #8b0000 100%)',
+          color: '#fff',
+          boxShadow: '0 0 12px rgba(0,0,0,0.4)',
+          textAlign: 'center'
+        }}
+      >
+        Cancel lobby
+      </button>
+    )}
+  </div>
+)}
             {/* Game result in popup */}
             {selectedGameResult && (
               <div style={{ marginTop: 14 }}>
