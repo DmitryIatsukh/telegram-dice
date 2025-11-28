@@ -89,7 +89,16 @@ const [newLobbyBet, setNewLobbyBet] = useState<number>(1)
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-    const [userBets, setUserBets] = useState<Record<number, number>>({})
+      const [userBets, setUserBets] = useState<Record<number, number>>({})
+
+  // NEW: holds
+  const [heldBets, setHeldBets] = useState<Record<number, number>>({})
+
+  const totalHeld = Object.values(heldBets).reduce(
+    (sum, v) => sum + v,
+    0
+  )
+  const availableBalance = tonBalance - totalHeld
   // to avoid applying the same game result multiple times
   const [processedResults, setProcessedResults] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState<Page>('lobbies')
@@ -219,6 +228,24 @@ useEffect(() => {
       setCurrentUser(null);
     }
   }, []);
+  // Clean up holds when lobbies list changes (finished/cancelled/removed)
+  useEffect(() => {
+    setHeldBets(prev => {
+      const copy = { ...prev }
+      const activeOpenIds = new Set(
+        lobbies
+          .filter(l => l.status === 'open')
+          .map(l => l.id)
+      )
+      for (const key in copy) {
+        const id = Number(key)
+        if (!activeOpenIds.has(id)) {
+          delete copy[id]
+        }
+      }
+      return copy
+    })
+  }, [lobbies])
 // ---- apply game results to balance (with 5% house rake) + sync wallet ----
 useEffect(() => {
   if (!currentUser) return
@@ -330,9 +357,10 @@ useEffect(() => {
     return
   }
 
-  // (optional) balance check – keep or remove as you prefer
-  if (newLobbyBet > tonBalance) {
-    setErrorMessage("You don't have enough balance for this bet")
+   if (newLobbyBet > availableBalance) {
+    setErrorMessage(
+      "You don't have enough available balance for this bet (some funds may be held in other lobbies)"
+    )
     return
   }
 
@@ -397,10 +425,12 @@ useEffect(() => {
   const lobby = lobbies.find(l => l.id === id)
   const lobbyBet = lobby?.betAmount ?? 0.1
 
-  // 💰 check balance vs bet
-  if (tonBalance < lobbyBet) {
+    // 💰 check *available* balance vs bet
+  if (availableBalance < lobbyBet) {
     setErrorMessage(
-      `You need at least ${lobbyBet.toFixed(2)} TON to join this lobby.`
+      `You need at least ${lobbyBet.toFixed(
+        2
+      )} TON available to join (some funds may be held in other lobbies).`
     )
     return
   }
@@ -428,13 +458,31 @@ useEffect(() => {
       }
       return res.json()
     })
-    .then((lobby: Lobby | null) => {
-  if (!lobby) return
-  setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
-  setJoinPin('')
-  setSelectedLobbyId(lobby.id)
-  setCurrentPage('game')
-})
+       .then((lobby: Lobby | null) => {
+      if (!lobby) return
+
+      setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
+      setJoinPin('')
+      setSelectedLobbyId(lobby.id)
+      setCurrentPage('game')
+
+      // ⭐ HOLD: if we weren’t already holding for this lobby and we’re in it now,
+      // reserve the lobby bet for this user
+      if (currentUser) {
+        const meNow = lobby.players.find(p => p.id === currentUser.id)
+        if (meNow && !heldBets[lobby.id]) {
+          const bet =
+            typeof lobby.betAmount === 'number' && lobby.betAmount > 0
+              ? lobby.betAmount
+              : lobbyBet
+
+          setHeldBets(prev => ({
+            ...prev,
+            [lobby.id]: bet
+          }))
+        }
+      }
+    })
 }
 
   const toggleReady = (id: number): Promise<Lobby | null> => {
@@ -517,9 +565,21 @@ const leaveLobby = (id: number) => {
       }
       return res.json()
     })
-    .then((lobby: Lobby | null) => {
+        .then((lobby: Lobby | null) => {
       if (!lobby) return
       setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
+
+      // ⭐ RELEASE: if we are no longer in this lobby, release the held bet
+      if (currentUser) {
+        const stillIn = lobby.players.some(p => p.id === currentUser.id)
+        if (!stillIn) {
+          setHeldBets(prev => {
+            const copy = { ...prev }
+            delete copy[id]
+            return copy
+          })
+        }
+      }
     })
 }
 
@@ -540,6 +600,12 @@ const cancelLobby = (id: number) => {
       // remove lobby from list and close popup
       setLobbies(prev => prev.filter(l => l.id !== id))
       setSelectedLobbyId(null)
+// ⭐ RELEASE: cancel = everyone refunded
+      setHeldBets(prev => {
+        const copy = { ...prev }
+        delete copy[id]
+        return copy
+      })
     })
 }
     const selectedLobby =
