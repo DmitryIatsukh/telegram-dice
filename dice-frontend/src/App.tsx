@@ -367,13 +367,15 @@ useEffect(() => {
     setCurrentPage('lobbies')
 
     // ⭐ Auto-join + auto-ready creator
-    if (currentUser) {
-      await joinLobby(
-        lobby.id,
-        createMode === 'private' ? createPin : undefined
-      )
-      await toggleReady(lobby.id)
-    }
+    // Auto-join lobby creator with 150ms delay to ensure lobby exists
+if (currentUser) {
+  setTimeout(() => {
+    joinLobby(
+      lobby.id,
+      createMode === 'private' ? createPin : undefined
+    )
+  }, 150);
+}
   })
 }
 
@@ -449,7 +451,7 @@ useEffect(() => {
     return Promise.resolve(null)
   }
 
-  return fetch(`${API}/lobbies/${id}/ready`, {
+  return fetch(`${API}/lobbies/${id}/toggle-ready`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId: currentUser.id })
