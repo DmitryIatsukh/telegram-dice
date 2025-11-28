@@ -1718,8 +1718,53 @@ const shortAddress =
         </div>
       </div>
 
-      {/* Top banner: last win & biggest win */}
-      {/* (keep your existing lastWin / biggestWin banner here — unchanged) */}
+      {/* ---- GLOBAL WIN BANNER ---- */}
+{(() => {
+  // Find the latest finished game in all lobbies
+  const finished = lobbies
+    .filter(l => l.status === 'finished' && l.gameResult)
+    .sort((a, b) => b.id - a.id);
+
+  if (finished.length === 0) return null;
+
+  const latest = finished[0].gameResult;
+  if (!latest) return null;
+
+  // Biggest win ever (based on pot size)
+  const biggest = finished.reduce((best, l) => {
+    const res = l.gameResult;
+    if (!res) return best;
+    const pot = (l.betAmount ?? 1) * (l.players.length || 1);
+    return pot > best.pot ? { pot, res, lobby: l } : best;
+  }, { pot: 0, res: null as GameResult | null, lobby: null as Lobby | null });
+
+  return (
+    <div
+      style={{
+        background:
+          'linear-gradient(135deg, rgba(0,40,80,0.9), rgba(0,10,25,0.95))',
+        borderRadius: 12,
+        padding: 12,
+        margin: '6px 0 16px',
+        border: '1px solid rgba(0,180,255,0.3)',
+        boxShadow: '0 0 14px rgba(0,150,255,0.25)',
+      }}
+    >
+      {/* Latest win */}
+      <div style={{ fontSize: 13, marginBottom: 6 }}>
+        🏆 <b>{latest.winnerName}</b> won with <b>{latest.highest}</b> 🎲
+      </div>
+
+      {/* Biggest win ever */}
+      {biggest.res && (
+        <div style={{ fontSize: 12, opacity: 0.85 }}>
+          💰 Highest win ever: <b>{biggest.res!.winnerName}</b>{' '}
+          (Lobby #{biggest.lobby!.id})
+        </div>
+      )}
+    </div>
+  );
+})()}
 
       {/* Pages */}
       {currentPage === 'lobbies' && renderLobbiesPage()}
