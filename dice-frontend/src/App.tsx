@@ -161,6 +161,23 @@ const [isWithdrawing, setIsWithdrawing] = useState(false);
     }, 1500)
     return () => clearInterval(interval)
   }, [])
+  // Auto-select a lobby where I am a player/creator after reload
+  useEffect(() => {
+    if (!currentUser) return;
+
+    // find lobbies where I'm a player or the creator
+    const myLobbies = lobbies.filter(
+      l =>
+        l.creatorId === currentUser.id ||
+        l.players.some(p => p.id === currentUser.id)
+    );
+
+    // if nothing selected and there is at least one lobby -> pick the first
+    if (selectedLobbyId == null && myLobbies.length > 0) {
+      setSelectedLobbyId(myLobbies[0].id);
+      setCurrentPage('game'); // jump straight to Game tab
+    }
+  }, [lobbies, currentUser, selectedLobbyId]);
   const fetchWalletState = async (telegramId: string) => {
   try {
     const res = await fetch(`${API_BASE}/api/wallet/state/${telegramId}`);
@@ -699,7 +716,16 @@ const handleWithdraw = async () => {
     return;
   }
 
-  const amountNumber = Number(withdrawAmount);
+    const amountNumber = Number(withdrawAmount);
+
+  if (amountNumber > availableBalance) {
+    setErrorMessage(
+      `You can withdraw at most ${availableBalance.toFixed(
+        2
+      )} TON (the rest is held in active lobbies).`
+    );
+    return;
+  }
 
   try {
     setErrorMessage(null);
@@ -985,14 +1011,24 @@ const shortAddress =
                 </span>
                 TON balance
               </div>
-              <div
+                            <div
                 style={{
                   fontSize: 26,
                   fontWeight: 700,
                   textShadow: '0 0 12px rgba(64,207,255,0.8)'
                 }}
               >
-                {tonBalance.toFixed(2)}
+                {availableBalance.toFixed(2)}
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: '#9ca3af',
+                  marginTop: 2
+                }}
+              >
+                Total: {tonBalance.toFixed(2)} TON · Held:{' '}
+                {totalHeld.toFixed(2)} TON
               </div>
             </div>
 
