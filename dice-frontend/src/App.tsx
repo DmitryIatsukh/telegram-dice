@@ -35,6 +35,7 @@ type Lobby = {
   creatorName: string | null
   isPrivate: boolean
   betAmount?: number      // 👈 NEW
+maxPlayers?: number 
   gameResult: GameResult
 }
 
@@ -77,6 +78,7 @@ function DiceApp() {
   const [selectedLobbyId, setSelectedLobbyId] = useState<number | null>(null)
 
   const [createMode, setCreateMode] = useState<'public' | 'private'>('public')
+const [newLobbySize, setNewLobbySize] = useState<2 | 4>(4);
   const [createPin, setCreatePin] = useState('')
   const [joinPin, setJoinPin] = useState('')
 // --- bet amount when creating a new lobby ---
@@ -346,7 +348,8 @@ useEffect(() => {
       name: currentUser.username || currentUser.name,
       isPrivate: createMode === 'private',
       pin: createMode === 'private' ? createPin : undefined,
-      betAmount: betToSend,           // 👈 NEW
+      betAmount: betToSend,     
+maxPlayers: newLobbySize        // 👈 NEW
     }),
   })
     .then(async (res) => {
@@ -1243,7 +1246,37 @@ const shortAddress =
             Private
           </label>
         </div>
-
+        {/* Lobby size: 2 or 4 players */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 12,
+            alignItems: 'center',
+            marginBottom: 8
+          }}
+        >
+          <span style={{ fontSize: 13, color: '#ccc' }}>Lobby size:</span>
+          <label
+            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13 }}
+          >
+            <input
+              type="radio"
+              checked={newLobbySize === 2}
+              onChange={() => setNewLobbySize(2)}
+            />
+            2 players
+          </label>
+          <label
+            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13 }}
+          >
+            <input
+              type="radio"
+              checked={newLobbySize === 4}
+              onChange={() => setNewLobbySize(4)}
+            />
+            4 players
+          </label>
+        </div>
         {createMode === 'private' && (
           <div style={{ marginBottom: 8 }}>
             <span style={{ fontSize: 13 }}>PIN (4 digits): </span>
@@ -1262,6 +1295,7 @@ const shortAddress =
               }}
             />
           </div>
+
         )}
         {/* Bet amount for new lobby */}
         <div style={{ marginBottom: 8 }}>
@@ -1365,17 +1399,15 @@ const shortAddress =
           <p style={{ fontSize: 13, color: '#ccc' }}>
             Creator: {lobby.creatorName || 'not set yet (no players)'}
           </p>
-                  <p style={{ fontSize: 13, color: '#ccc' }}>Players: {lobby.players.length}</p>
-<p style={{ fontSize: 13, color: '#ccc' }}>
-  Base bet:{' '}
-  {lobby.betAmount != null ? `${lobby.betAmount.toFixed(2)} TON` : '—'}
-</p>
-<p style={{ fontSize: 13, color: '#ccc' }}>
-  Bet per player:{' '}
-  {typeof lobby.betAmount === 'number'
-    ? `${lobby.betAmount.toFixed(2)} TON`
-    : '—'}
-</p>
+                 <p style={{ fontSize: 13, color: '#ccc' }}>
+            Players: {lobby.players.length}/{lobby.maxPlayers ?? 4}
+          </p>
+          <p style={{ fontSize: 13, color: '#ccc' }}>
+            Bet per player:{' '}
+            {typeof lobby.betAmount === 'number'
+              ? `${lobby.betAmount.toFixed(2)} TON`
+              : '—'}
+          </p>
           <p style={{ fontSize: 13, color: '#ccc' }}>
             Bet: { (lobby.betAmount ?? 1).toFixed(2) } TON
           </p>
@@ -1603,9 +1635,6 @@ paddingBottom: 100,
             </p>
             <p style={{ fontSize: 13, color: '#ccc' }}>
               Creator: {selectedLobby.creatorName || 'not set'}
-            </p>
-            <p style={{ fontSize: 13, color: '#ccc' }}>
-              Bet: {(selectedLobby.betAmount ?? 1).toFixed(2)} TON
             </p>
 
             {/* Players list:
