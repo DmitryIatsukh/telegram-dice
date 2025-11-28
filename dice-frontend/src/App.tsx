@@ -683,14 +683,44 @@ const handleWithdraw = async () => {
   }, [currentUser, tonBalance, history]);
 
 
-  // ---- derived: last win & biggest win ----
+  // ---- derived: GLOBAL last win & biggest win (all players) ----
+type BannerWin = { playerName: string; amount: number } | null
 
-  const winHistory = history.filter(h => h.type === 'bet' && h.result === 'win')
-  const lastWin: HistoryItem | null = winHistory.length > 0 ? winHistory[0] : null
-  const biggestWin: HistoryItem | null =
-    winHistory.length > 0
-      ? winHistory.reduce((max, item) => (item.amount > max.amount ? item : max), winHistory[0])
-      : null
+const finishedLobbies = lobbies.filter(
+  l => l.status === 'finished' && l.gameResult && typeof l.betAmount === 'number'
+)
+
+const computeNetWinForLobby = (lobby: Lobby): number => {
+  if (!lobby.gameResult || typeof lobby.betAmount !== 'number') return 0
+  const nPlayers = lobby.gameResult.players.length || 1
+  const bet = lobby.betAmount
+  const totalPot = bet * nPlayers
+  const rake = totalPot * 0.05
+  const grossWin = totalPot - bet
+  const net = grossWin - rake
+  return Math.max(0, net)
+}
+
+let lastWin: BannerWin = null
+let biggestWin: BannerWin = null
+
+if (finishedLobbies.length > 0) {
+  // "last win" = finished lobby with highest id (latest)
+  const lastLobby = finishedLobbies.reduce((a, b) => (a.id > b.id ? a : b))
+  // "biggest win" = lobby with highest net win
+  const biggestLobby = finishedLobbies.reduce((a, b) =>
+    computeNetWinForLobby(a) >= computeNetWinForLobby(b) ? a : b
+  )
+
+  lastWin = {
+    playerName: lastLobby.gameResult!.winnerName,
+    amount: computeNetWinForLobby(lastLobby)
+  }
+  biggestWin = {
+    playerName: biggestLobby.gameResult!.winnerName,
+    amount: computeNetWinForLobby(biggestLobby)
+  }
+}
 
   // ---- loading screen ----
 
@@ -1455,48 +1485,44 @@ paddingBottom: 100,
         }}
       >
         {lastWin || biggestWin ? (
-          <>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>Last win</div>
-                {lastWin ? (
-                  <div>
-                    <span style={{ fontWeight: 700 }}>
-                      {lastWin.playerName || currentUser?.name || 'You'}
-                    </span>{' '}
-                    <span style={{ color: '#bbf7d0', fontWeight: 600 }}>
-                      +{lastWin.amount.toFixed(2)} TON
-                    </span>
-                  </div>
-                ) : (
-                  <div style={{ opacity: 0.7 }}>No wins yet</div>
-                )}
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>Biggest win</div>
-                {biggestWin ? (
-                  <div>
-                    <span style={{ fontWeight: 700 }}>
-                      {biggestWin.playerName || currentUser?.name || 'You'}
-                    </span>{' '}
-                    <span style={{ color: '#facc15', fontWeight: 600 }}>
-                      +{biggestWin.amount.toFixed(2)} TON
-                    </span>
-                  </div>
-                ) : (
-                  <div style={{ opacity: 0.7 }}>No wins yet</div>
-                )}
-              </div>
-            </div>
-            <div style={{ fontSize: 10, opacity: 0.8 }}>
-              Stats are based on your recent games in this session.
-            </div>
-          </>
-        ) : (
-          <div style={{ fontSize: 12 }}>
-            No wins yet – roll the dice in any lobby to set your first record 🎲
+  <>
+    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+      <div>
+        <div style={{ fontSize: 11, opacity: 0.8 }}>Last win</div>
+        {lastWin ? (
+          <div>
+            <span style={{ fontWeight: 700 }}>{lastWin.playerName}</span>{' '}
+            <span style={{ color: '#bbf7d0', fontWeight: 600 }}>
+              +{lastWin.amount.toFixed(2)} TON
+            </span>
           </div>
+        ) : (
+          <div style={{ opacity: 0.7 }}>No wins yet</div>
         )}
+      </div>
+      <div style={{ textAlign: 'right' }}>
+        <div style={{ fontSize: 11, opacity: 0.8 }}>Biggest win</div>
+        {biggestWin ? (
+          <div>
+            <span style={{ fontWeight: 700 }}>{biggestWin.playerName}</span>{' '}
+            <span style={{ color: '#facc15', fontWeight: 600 }}>
+              +{biggestWin.amount.toFixed(2)} TON
+            </span>
+          </div>
+        ) : (
+          <div style={{ opacity: 0.7 }}>No wins yet</div>
+        )}
+      </div>
+    </div>
+    <div style={{ fontSize: 10, opacity: 0.8 }}>
+      Stats are global – based on all finished lobbies.
+    </div>
+  </>
+) : (
+  <div style={{ fontSize: 12 }}>
+    No wins yet – roll the dice in any lobby to set the first record 🎲
+  </div>
+)}
       </div>
 
       {currentPage === 'lobbies' ? renderLobbiesPage() : renderProfilePage()}
@@ -1817,6 +1843,23 @@ paddingBottom: 100,
           </div>
         </div>
       )}
+{selectedLobby.gameResult.rounds && (
+  <div style={{ marginTop: 10, fontSize: 12 }}>
+    <h4>Roll log:</h4>
+    {selectedLobby.gameResult.rounds.map((round, i) => (
+      <div key={i} style={{ marginTop: 4 }}>
+        <div style={{ fontWeight: 600 }}>Round {i + 1}</div>
+        <ul style={{ paddingLeft: 18 }}>
+          {round.map(p => (
+            <li key={p.id}>
+              {p.name}: rolled {p.roll}
+            </li>
+          ))}
+        </ul>
+      </div>
+    ))}
+  </div>
+)}
 {/* Bottom toolbar */}
 <div
   style={{
