@@ -179,6 +179,9 @@ router.post('/:id/start', (req, res) => {
   if (String(userId) !== String(lobby.creatorId)) {
     return res.status(403).json({ error: 'Only lobby creator can start game' });
   }
+  if (lobby.status !== 'open') {
+    return res.status(400).json({ error: 'Lobby is not open' });
+  }
 
   const readyPlayers = lobby.players.filter(p => p.isReady);
   if (readyPlayers.length < 2) {
@@ -187,43 +190,71 @@ router.post('/:id/start', (req, res) => {
       .json({ error: 'Need at least 2 ready players to start' });
   }
 
-  // 1) Roll dice
-  readyPlayers.forEach(p => {
-    p.roll = rollDie();
-  });
+  // --- AUTO REROLL LOGIC ---
+  let currentRound = readyPlayers.map(p => ({
+    id: p.id,
+    name: p.name
+  }));
 
-  const highest = Math.max(...readyPlayers.map(p => p.roll));
-  const winners = readyPlayers.filter(p => p.roll === highest);
+  const roundsLog = [];
 
-  // For now, if tie – first winner in list takes pot
-  const winner = winners[0];
-
-  const bet = lobby.betAmount || 0.1;
-  const n = readyPlayers.length;
-  const winnerProfit = bet * (n - 1);
-
-  // 2) Apply payouts to wallets
-  readyPlayers.forEach(p => {
-    if (p.id === winner.id) {
-      // winner: gets profit (others' bets). We assume bet itself was not pre-deducted.
-      recordBetResult(p.id, p.name, winnerProfit, 'win');
-    } else {
-      // losers: lose their bet
-      recordBetResult(p.id, p.name, bet, 'lose');
-    }
-  });
-
-  // 3) Save result on lobby
-  lobby.gameResult = {
-    winnerId: winner.id,
-    winnerName: winner.name,
-    highest,
-    players: readyPlayers.map(p => ({
+  while (true) {
+    // roll for this round
+    const rolls = currentRound.map(p => ({
       id: p.id,
       name: p.name,
-      roll: p.roll,
-    })),
-  };
+      roll: rollDie()
+    }));
+
+    roundsLog.push(rolls);
+
+    const highest = Math.max(...rolls.map(r => r.roll));
+
+    const top = rolls.filter(r => r.roll === highest);
+
+    if (top.length === 1) {
+      // final winner
+      const winner = top[0];
+
+      const bet = lobby.betAmount ?? 0.1;
+      const nPlayers = readyPlayers.length;
+
+      // total pot
+      const totalPot = bet * nPlayers;
+
+      // house rake 5% of total pot
+      const rake = totalPot * 0.05;
+
+      // gross win before rake
+      const grossWin = totalPot - bet;
+
+      const netWin = grossWin - rake;
+
+      // record results in wallet
+      readyPlayers.forEach(p => {
+        if (p.id === winner.id) {
+          recordBetResult(p.id, p.name, netWin, 'win');
+        } else {
+          recordBetResult(p.id, p.name, bet, 'lose');
+        }
+      });
+
+      lobby.status = 'finished';
+      lobby.gameResult = {
+        winnerId: winner.id,
+        winnerName: winner.name,
+        highest,
+        players: rolls,      // final round only
+        rounds: roundsLog    // all rounds including tie-breakers
+      };
+
+      return res.json(lobby);
+    }
+
+    // tie → reroll ONLY the tied players
+    currentRound = top.map(t => ({ id: t.id, name: t.name }));
+  }
+});
 
   lobby.status = 'finished';
 
