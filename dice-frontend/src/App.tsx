@@ -1663,116 +1663,118 @@ paddingBottom: 100,
   Bet per player: {selectedLobby.betAmount?.toFixed(2)} TON
 </div>
 {!gameFinished && (
-  <div
-    // ACTION BUTTONS ROW
-    style={{
-      display: 'flex',
-      flexWrap: 'wrap',
-      gap: 8,
-      marginTop: 8
-    }}
-  >
-    {/* JOIN / LEAVE – only for non-creator */}
-    {!isCreatorInSelectedLobby && (
-      <button
-        onClick={() =>
-          isUserInSelectedLobby
-            ? leaveLobby(selectedLobby.id)
-            : joinLobby(
-                selectedLobby.id,
-                selectedLobby.isPrivate ? joinPin : undefined
-              )
-        }
-        style={{
-          padding: '8px 16px',
-          minWidth: 120,
-          borderRadius: 999,
-          border: 'none',
-          cursor: 'pointer',
-          fontSize: 13,
-          fontWeight: 600,
-          background: isUserInSelectedLobby
-            ? 'linear-gradient(135deg, #f97316 0%, #fb7185 50%, #fee2e2 100%)'
-            : 'linear-gradient(135deg, #00d4ff 0%, #0074ff 60%, #4a00e0 100%)',
-          color: isUserInSelectedLobby ? '#111827' : '#fff',
-          boxShadow: '0 0 12px rgba(0,0,0,0.4)',
-          textAlign: 'center'
-        }}
-      >
-        {isUserInSelectedLobby ? 'Leave lobby' : 'Join lobby'}
-      </button>
-    )}
+  <>
+    {/* ACTION BUTTONS ROW */}
+    <div
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: 8
+      }}
+    >
+      {/* JOIN / LEAVE – only for non-creator */}
+      {!isCreatorInSelectedLobby && (
+        <button
+          onClick={() =>
+            isUserInSelectedLobby
+              ? leaveLobby(selectedLobby.id)
+              : joinLobby(
+                  selectedLobby.id,
+                  selectedLobby.isPrivate ? joinPin : undefined
+                )
+          }
+          style={{
+            padding: '8px 16px',
+            minWidth: 120,
+            borderRadius: 999,
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: 13,
+            fontWeight: 600,
+            background: isUserInSelectedLobby
+              ? 'linear-gradient(135deg, #f97316 0%, #fb7185 50%, #fee2e2 100%)'
+              : 'linear-gradient(135deg, #00d4ff 0%, #0074ff 60%, #4a00e0 100%)',
+            color: isUserInSelectedLobby ? '#111827' : '#fff',
+            boxShadow: '0 0 12px rgba(0,0,0,0.4)',
+            textAlign: 'center'
+          }}
+        >
+          {isUserInSelectedLobby ? 'Leave lobby' : 'Join lobby'}
+        </button>
+      )}
 
-    {/* READY SWITCH – only for players in lobby, not creator */}
-    {!isCreatorInSelectedLobby && isUserInSelectedLobby && (
-      <button
-        onClick={() => toggleReady(selectedLobby.id)}
-        style={{
-          padding: '8px 16px',
-          minWidth: 120,
-          borderRadius: 999,
-          border: 'none',
-          cursor: 'pointer',
-          fontSize: 13,
-          fontWeight: 600,
-          background: isUserReadyInSelectedLobby
-            ? 'linear-gradient(135deg, #22c55e 0%, #4ade80 50%, #bbf7d0 100%)'
-            : 'linear-gradient(135deg, #f97316 0%, #fb7185 50%, #fee2e2 100%)',
-          color: isUserReadyInSelectedLobby ? '#022c22' : '#111827',
-          boxShadow: '0 0 12px rgba(0,0,0,0.4)',
-          textAlign: 'center'
-        }}
-      >
-        {isUserReadyInSelectedLobby ? 'Unready' : 'Ready'}
-      </button>
-    )}
+      {/* READY SWITCH */}
+      {!isCreatorInSelectedLobby && isUserInSelectedLobby && (
+        <button
+          onClick={() => toggleReady(selectedLobby.id)}
+          style={{
+            padding: '8px 16px',
+            minWidth: 120,
+            borderRadius: 999,
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: 13,
+            fontWeight: 600,
+            background: isUserReadyInSelectedLobby
+              ? 'linear-gradient(135deg, #22c55e 0%, #4ade80 50%, #bbf7d0 100%)'
+              : 'linear-gradient(135deg, #f97316 0%, #fb7185 50%, #fee2e2 100%)',
+            color: isUserReadyInSelectedLobby ? '#022c22' : '#111827',
+            boxShadow: '0 0 12px rgba(0,0,0,0.4)',
+            textAlign: 'center'
+          }}
+        >
+          {isUserReadyInSelectedLobby ? 'Unready' : 'Ready'}
+        </button>
+      )}
 
-    {/* START GAME – only creator */}
-    {isCreatorInSelectedLobby && (
-      <button
-        onClick={() => startGame(selectedLobby.id)}
-        style={{
-          padding: '8px 16px',
-          minWidth: 120,
-          borderRadius: 999,
-          border: 'none',
-          cursor: 'pointer',
-          fontSize: 13,
-          fontWeight: 600,
-          background:
-            'linear-gradient(135deg, #22c55e 0%, #4ade80 50%, #bbf7d0 100%)',
-          color: '#022c22',
-          boxShadow: '0 0 12px rgba(0,0,0,0.4)',
-          textAlign: 'center'
-        }}
-      >
-        Start game
-      </button>
-    )}
+      {/* START GAME */}
+      {isCreatorInSelectedLobby && (
+        <button
+          onClick={() => startGame(selectedLobby.id)}
+          style={{
+            padding: '8px 16px',
+            minWidth: 120,
+            borderRadius: 999,
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: 13,
+            fontWeight: 600,
+            background:
+              'linear-gradient(135deg, #22c55e 0%, #4ade80 50%, #bbf7d0 100%)',
+            color: '#022c22',
+            boxShadow: '0 0 12px rgba(0,0,0,0.4)',
+            textAlign: 'center'
+          }}
+        >
+          Start game
+        </button>
+      )}
 
-    {/* CANCEL LOBBY – only creator */}
-    {isCreatorInSelectedLobby && (
-      <button
-        onClick={() => cancelLobby(selectedLobby.id)}
-        style={{
-          padding: '8px 16px',
-          minWidth: 120,
-          borderRadius: 999,
-          border: 'none',
-          cursor: 'pointer',
-          fontSize: 13,
-          fontWeight: 600,
-          background:
-            'linear-gradient(135deg, #ff4d6a 0%, #ff0000 40%, #8b0000 100%)',
-          color: '#fff',
-          boxShadow: '0 0 12px rgba(0,0,0,0.4)',
-          textAlign: 'center'
-        }}
-      >
-        Cancel lobby
-      </button>
-    )}
-  </div>
+      {/* CANCEL LOBBY */}
+      {isCreatorInSelectedLobby && (
+        <button
+          onClick={() => cancelLobby(selectedLobby.id)}
+          style={{
+            padding: '8px 16px',
+            minWidth: 120,
+            borderRadius: 999,
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: 13,
+            fontWeight: 600,
+            background:
+              'linear-gradient(135deg, #ff4d6a 0%, #ff0000 40%, #8b0000 100%)',
+            color: '#fff',
+            boxShadow: '0 0 12px rgba(0,0,0,0.4)',
+            textAlign: 'center'
+          }}
+        >
+          Cancel lobby
+        </button>
+      )}
+    </div>
+  </>
 )}
             {/* Game result in popup */}
             {selectedGameResult && (
