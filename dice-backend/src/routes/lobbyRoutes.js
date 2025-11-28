@@ -111,7 +111,6 @@ router.post('/:id/leave', (req, res) => {
     return res.status(400).json({ error: 'Lobby is not open' });
   }
 
-  // creator must cancel, not leave
   if (String(userId) === lobby.creatorId) {
     return res
       .status(400)
@@ -127,6 +126,7 @@ router.post('/:id/leave', (req, res) => {
 
   res.json(lobby);
 });
+
 // POST /api/lobbies/:id/ready  (toggle ready)
 router.post('/:id/ready', (req, res) => {
   const id = Number(req.params.id);
@@ -144,31 +144,29 @@ router.post('/:id/ready', (req, res) => {
   player.isReady = !player.isReady;
   res.json(lobby);
 });
-app.post('/api/lobbies/:id/cancel', (req, res) => {
-  const lobbyId = Number(req.params.id);
+router.post('/:id/cancel', (req, res) => {
+  const id = Number(req.params.id);
   const { userId } = req.body;
 
-  const lobby = lobbies.find(l => l.id === lobbyId);
+  const lobby = lobbies.find(l => l.id === id);
   if (!lobby) {
     return res.status(404).json({ error: 'Lobby not found' });
   }
 
-  if (lobby.creatorId !== userId) {
+  if (String(userId) !== lobby.creatorId) {
     return res.status(403).json({ error: 'Only creator can cancel lobby' });
   }
 
-  if (lobby.status === 'finished') {
-    return res.status(400).json({ error: 'Lobby already finished' });
+  if (lobby.status !== 'open') {
+    return res.status(400).json({ error: 'Lobby is not open' });
   }
 
-  // remove the lobby completely
-  const index = lobbies.findIndex(l => l.id === lobbyId);
-  if (index !== -1) {
-    lobbies.splice(index, 1);
-  }
+  // remove lobby completely
+  lobbies = lobbies.filter(l => l.id !== id);
 
   return res.json({ ok: true });
 });
+
 
 // POST /api/lobbies/:id/start
 router.post('/:id/start', (req, res) => {
