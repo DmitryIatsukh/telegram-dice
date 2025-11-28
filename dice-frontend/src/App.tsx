@@ -78,7 +78,7 @@ function DiceApp() {
   const [selectedLobbyId, setSelectedLobbyId] = useState<number | null>(null)
 
   const [createMode, setCreateMode] = useState<'public' | 'private'>('public')
-const [newLobbySize] = useState<2 | 4>(4);
+const [newLobbySize setNewLobbySize] = useState<2 | 4>(4);
   const [createPin, setCreatePin] = useState('')
   const [joinPin, setJoinPin] = useState('')
 // --- bet amount when creating a new lobby ---
@@ -1501,7 +1501,41 @@ const shortAddress =
             />
           </div>
         )}
-
+        {/* Lobby size: 2 or 4 players */}
+        <div style={{ marginBottom: 8 }}>
+          <span style={{ fontSize: 13, marginRight: 8 }}>Lobby size:</span>
+          <label
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 13,
+              marginRight: 10,
+            }}
+          >
+            <input
+              type="radio"
+              checked={newLobbySize === 2}
+              onChange={() => setNewLobbySize(2)}
+            />
+            2 players
+          </label>
+          <label
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 13,
+            }}
+          >
+            <input
+              type="radio"
+              checked={newLobbySize === 4}
+              onChange={() => setNewLobbySize(4)}
+            />
+            4 players
+          </label>
+        </div>
         {/* Bet amount for new lobby */}
         <div style={{ marginBottom: 8 }}>
           <span style={{ fontSize: 13 }}>Bet amount (TON): </span>
@@ -1605,8 +1639,9 @@ const shortAddress =
             Creator: {lobby.creatorName || 'not set yet (no players)'}
           </p>
           <p style={{ fontSize: 13, color: '#ccc' }}>
-            Players: {lobby.players.length}/{lobby.maxPlayers ??4}
-          </p>
+  Players: {lobby.players.length}
+  {lobby.maxPlayers ? ` / ${lobby.maxPlayers}` : ''}
+</p>
           <p style={{ fontSize: 13, color: '#ccc' }}>
             Bet: {(lobby.betAmount ?? 1).toFixed(2)} TON
           </p>
