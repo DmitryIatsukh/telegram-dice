@@ -78,7 +78,7 @@ function DiceApp() {
   const [selectedLobbyId, setSelectedLobbyId] = useState<number | null>(null)
 
   const [createMode, setCreateMode] = useState<'public' | 'private'>('public')
-const [newLobbySize, setNewLobbySize] = useState<2 | 4>(4);
+const [newLobbySize] = useState<2 | 4>(4);
   const [createPin, setCreatePin] = useState('')
   const [joinPin, setJoinPin] = useState('')
 // --- bet amount when creating a new lobby ---
@@ -1605,7 +1605,7 @@ const shortAddress =
             Creator: {lobby.creatorName || 'not set yet (no players)'}
           </p>
           <p style={{ fontSize: 13, color: '#ccc' }}>
-            Players: {lobby.players.length}
+            Players: {lobby.players.length}/{lobby.maxPlayers ??4}
           </p>
           <p style={{ fontSize: 13, color: '#ccc' }}>
             Bet: {(lobby.betAmount ?? 1).toFixed(2)} TON
