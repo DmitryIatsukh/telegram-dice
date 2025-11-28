@@ -49,7 +49,7 @@ type HistoryItem = {
   playerName?: string
 }
 
-type Page = 'lobbies' | 'profile'
+type Page = 'lobbies' | 'profile' | 'game'
 
 function App() {
   const TON_MANIFEST_URL =
@@ -367,7 +367,7 @@ maxPlayers: newLobbySize        // 👈 NEW
     setLobbies(prev => [...prev, lobby])
     setSelectedLobbyId(lobby.id)
     setCreatePin('')
-    setCurrentPage('lobbies')
+      setCurrentPage('game')
 
     // ⭐ Auto-join + auto-ready creator
     // Auto-join lobby creator with 150ms delay to ensure lobby exists
@@ -421,10 +421,12 @@ if (currentUser) {
       return res.json()
     })
     .then((lobby: Lobby | null) => {
-      if (!lobby) return
-      setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
-      setJoinPin('')
-    })
+  if (!lobby) return
+  setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
+  setJoinPin('')
+  setSelectedLobbyId(lobby.id)
+  setCurrentPage('game')
+})
 }
 
   const toggleReady = (id: number): Promise<Lobby | null> => {
@@ -552,9 +554,10 @@ const isUserReadyInSelectedLobby = isMeReady
 const isCreatorInSelectedLobby = isMeCreator
 const gameFinished = selectedLobby?.status === 'finished';
   const closePopup = () => {
-    setSelectedLobbyId(null)
-    setJoinPin('')
-  }
+  setSelectedLobbyId(null)
+  setJoinPin('')
+  setCurrentPage('lobbies')
+}
 
   // ---- TonConnect: deposit / withdraw ----
 
@@ -1206,6 +1209,270 @@ const shortAddress =
     )
   }
 
+  // ---- game page (single lobby view) ----
+  const renderGamePage = () => {
+    if (!selectedLobby) {
+      // no active / selected lobby
+      return (
+        <div style={{ padding: 16, marginTop: 40, textAlign: 'center' }}>
+          <div style={{ fontSize: 16, marginBottom: 8 }}>No active lobby</div>
+          <div style={{ fontSize: 13, opacity: 0.7 }}>
+            Go to <b>Lobbies</b> to create or join a game.
+          </div>
+        </div>
+      )
+    }
+
+    const gameFinished = selectedLobby.status === 'finished'
+
+    return (
+      <div style={{ padding: 16, paddingBottom: 80 }}>
+        {/* HEADER */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 8
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 2 }}>
+              Current game
+            </div>
+            <h3 style={{ margin: 0 }}>
+              Lobby #{selectedLobby.id}{' '}
+              {selectedLobby.isPrivate && (
+                <span
+                  style={{
+                    fontSize: 11,
+                    background:
+                      'linear-gradient(135deg, #ff4d6a 0%, #ff9a9e 100%)',
+                    padding: '2px 8px',
+                    borderRadius: 999,
+                    marginLeft: 6,
+                    color: '#111'
+                  }}
+                >
+                  Private
+                </span>
+              )}
+            </h3>
+            <div style={{ fontSize: 13, color: '#ccc' }}>
+              Status: {selectedLobby.status}
+            </div>
+            <div style={{ fontSize: 13, color: '#ccc' }}>
+              Creator: {selectedLobby.creatorName || 'not set'}
+            </div>
+            <div style={{ fontSize: 13, color: '#ccc' }}>
+              Bet per player:{' '}
+              {selectedLobby.betAmount?.toFixed(2) ?? '—'} TON
+            </div>
+          </div>
+
+          <button
+            onClick={closePopup}
+            style={{
+              padding: '6px 10px',
+              borderRadius: 999,
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 12,
+              background: 'rgba(255,255,255,0.06)',
+              color: '#fff'
+            }}
+          >
+            ⬅ Lobbies
+          </button>
+        </div>
+
+        {/* PLAYERS LIST */}
+        <p style={{ marginTop: 10, fontSize: 13 }}>
+          Players:{' '}
+          {[
+            `${selectedLobby.creatorName} (creator)`,
+            ...selectedLobby.players
+              .filter(p => p.id !== selectedLobby.creatorId)
+              .map(
+                p => `${p.name} (${p.isReady ? 'ready' : 'not ready'})`
+              )
+          ].join(', ')}
+        </p>
+
+        {/* PIN (only for private) */}
+        {selectedLobby.isPrivate && !isCreatorInSelectedLobby && (
+          <div style={{ marginTop: 10 }}>
+            <span style={{ fontSize: 14 }}>PIN: </span>
+            <input
+              type="password"
+              value={joinPin}
+              maxLength={4}
+              onChange={e =>
+                setJoinPin(e.target.value.replace(/\D/g, ''))
+              }
+              style={{
+                padding: '4px 8px',
+                borderRadius: 6,
+                border: '1px solid #555',
+                background: '#050511',
+                color: '#fff',
+                width: 80
+              }}
+            />
+          </div>
+        )}
+
+        {/* ACTION BUTTONS (only if game not finished) */}
+        {!gameFinished && (
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 8,
+              marginTop: 16
+            }}
+          >
+            {/* JOIN / LEAVE – only for non-creator */}
+            {!isCreatorInSelectedLobby && (
+              <button
+                onClick={() =>
+                  isUserInSelectedLobby
+                    ? leaveLobby(selectedLobby.id)
+                    : joinLobby(
+                        selectedLobby.id,
+                        selectedLobby.isPrivate ? joinPin : undefined
+                      )
+                }
+                style={{
+                  padding: '8px 16px',
+                  minWidth: 120,
+                  borderRadius: 999,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  background: isUserInSelectedLobby
+                    ? 'linear-gradient(135deg, #f97316 0%, #fb7185 50%, #fee2e2 100%)'
+                    : 'linear-gradient(135deg, #00d4ff 0%, #0074ff 60%, #4a00e0 100%)',
+                  color: isUserInSelectedLobby ? '#111827' : '#fff',
+                  boxShadow: '0 0 12px rgba(0,0,0,0.4)',
+                  textAlign: 'center'
+                }}
+              >
+                {isUserInSelectedLobby ? 'Leave lobby' : 'Join lobby'}
+              </button>
+            )}
+
+            {/* READY SWITCH – only for players in lobby, not creator */}
+            {!isCreatorInSelectedLobby && isUserInSelectedLobby && (
+              <button
+                onClick={() => toggleReady(selectedLobby.id)}
+                style={{
+                  padding: '8px 16px',
+                  minWidth: 120,
+                  borderRadius: 999,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  background: isUserReadyInSelectedLobby
+                    ? 'linear-gradient(135deg, #22c55e 0%, #4ade80 50%, #bbf7d0 100%)'
+                    : 'linear-gradient(135deg, #f97316 0%, #fb7185 50%, #fee2e2 100%)',
+                  color: isUserReadyInSelectedLobby ? '#022c22' : '#111827',
+                  boxShadow: '0 0 12px rgba(0,0,0,0.4)',
+                  textAlign: 'center'
+                }}
+              >
+                {isUserReadyInSelectedLobby ? 'Unready' : 'Ready'}
+              </button>
+            )}
+
+            {/* START GAME – only creator */}
+            {isCreatorInSelectedLobby && (
+              <button
+                onClick={() => startGame(selectedLobby.id)}
+                style={{
+                  padding: '8px 16px',
+                  minWidth: 120,
+                  borderRadius: 999,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  background:
+                    'linear-gradient(135deg, #22c55e 0%, #4ade80 50%, #bbf7d0 100%)',
+                  color: '#022c22',
+                  boxShadow: '0 0 12px rgba(0,0,0,0.4)',
+                  textAlign: 'center'
+                }}
+              >
+                Start game
+              </button>
+            )}
+
+            {/* CANCEL LOBBY – only creator */}
+            {isCreatorInSelectedLobby && (
+              <button
+                onClick={() => cancelLobby(selectedLobby.id)}
+                style={{
+                  padding: '8px 16px',
+                  minWidth: 120,
+                  borderRadius: 999,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  background:
+                    'linear-gradient(135deg, #ff4d6a 0%, #ff0000 40%, #8b0000 100%)',
+                  color: '#fff',
+                  boxShadow: '0 0 12px rgba(0,0,0,0.4)',
+                  textAlign: 'center'
+                }}
+              >
+                Cancel lobby
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Game result */}
+        {selectedGameResult && (
+          <div style={{ marginTop: 18 }}>
+            <h4>Game Result:</h4>
+            <p>
+              Winner: {selectedGameResult.winnerName} (roll{' '}
+              {selectedGameResult.highest})
+            </p>
+            <ul>
+              {selectedGameResult.players.map(p => (
+                <li key={p.id}>
+                  {p.name}: rolled {p.roll}
+                </li>
+              ))}
+            </ul>
+
+            {Array.isArray((selectedGameResult as any).rounds) &&
+              (selectedGameResult as any).rounds.length > 1 && (
+                <div style={{ marginTop: 8, fontSize: 12, color: '#ccc' }}>
+                  <div>Rounds (including rerolls):</div>
+                  {(selectedGameResult as any).rounds.map(
+                    (
+                      round: { id: string; name: string; roll: number }[],
+                      idx: number
+                    ) => (
+                      <div key={idx}>
+                        Round {idx + 1}:{' '}
+                        {round.map(r => `${r.name} (${r.roll})`).join(', ')}
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
+          </div>
+        )}
+      </div>
+    )
+  }
   // ---- lobbies page ----
 
   const renderLobbiesPage = () => (
@@ -1443,7 +1710,11 @@ const shortAddress =
       </div>
     )}
           <button
-            onClick={() => setSelectedLobbyId(lobby.id)}
+            onClick={() => {
+    setSelectedLobbyId(lobby.id)
+    setCurrentPage('game')
+  }}
+ 
             style={{
               padding: '7px 16px',
               background:
@@ -1562,72 +1833,13 @@ paddingBottom: 100,
 )}
       </div>
 
-      {currentPage === 'lobbies' ? renderLobbiesPage() : renderProfilePage()}
+      {currentPage === 'lobbies'
+  ? renderLobbiesPage()
+  : currentPage === 'profile'
+  ? renderProfilePage()
+  : renderGamePage()}
 
-                  {/* Lobby popup */}
-      {selectedLobby && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.75)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10
-          }}
-        >
-          <div
-            style={{
-              background:
-                'linear-gradient(145deg, rgba(0,25,70,0.96), rgba(0,18,50,0.96))',
-              borderRadius: 16,
-              padding: 20,
-              width: '90%',
-              maxWidth: 400,
-              border: '1px solid rgba(0,150,255,0.25)',
-              boxShadow: '0 0 25px rgba(0,0,0,0.9)'
-            }}
-          >
-            {/* HEADER */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}
-            >
-              <h3>
-                Lobby #{selectedLobby.id}{' '}
-                {selectedLobby.isPrivate && (
-                  <span
-                    style={{
-                      fontSize: 11,
-                      background:
-                        'linear-gradient(135deg, #ff4d6a 0%, #ff9a9e 100%)',
-                      padding: '2px 8px',
-                      borderRadius: 999,
-                      marginLeft: 6,
-                      color: '#111'
-                    }}
-                  >
-                    Private
-                  </span>
-                )}
-              </h3>
-              <button
-                onClick={closePopup}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#fff',
-                  fontSize: 18,
-                  cursor: 'pointer'
-                }}
-              >
-                ✕
-              </button>
-            </div>
+                  
 
             {/* INFO */}
             <p style={{ fontSize: 13, color: '#ccc' }}>
@@ -1903,6 +2115,32 @@ paddingBottom: 100,
           >
             Lobbies
           </button>
+{/* Game */}
+  <button
+    onClick={() => setCurrentPage('game')}
+    style={{
+      flex: 1,
+      padding: '8px 0',
+      borderRadius: 999,
+      border: 'none',
+      cursor: 'pointer',
+      fontSize: 14,
+      fontWeight: 600,
+      background:
+        currentPage === 'game'
+          ? 'linear-gradient(135deg, #4bbaff 0%, #5bc9ff 50%, #84d8ff 100%)'
+          : 'transparent',
+      color: currentPage === 'game' ? '#000' : '#fff',
+      textAlign: 'center',
+      boxShadow:
+        currentPage === 'game'
+          ? '0 0 10px rgba(80,180,255,0.6)'
+          : 'none',
+      whiteSpace: 'nowrap'
+    }}
+  >
+    Game
+  </button>
 
           <button
             onClick={() => setCurrentPage('profile')}
