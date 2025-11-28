@@ -1859,23 +1859,44 @@ paddingBottom: 100,
   </div>
 )}
 
-{selectedLobby.gameResult.rounds && (
-  <div style={{ marginTop: 10, fontSize: 12 }}>
-    <h4>Roll log:</h4>
-    {selectedLobby.gameResult.rounds.map((round, i) => (
-      <div key={i} style={{ marginTop: 4 }}>
-        <div style={{ fontWeight: 600 }}>Round {i + 1}</div>
-        <ul style={{ paddingLeft: 18 }}>
-          {round.map(p => (
-            <li key={p.id}>
-              {p.name}: rolled {p.roll}
-            </li>
-          ))}
-        </ul>
-      </div>
-    ))}
+{/* Game result in popup */}
+{selectedGameResult && (
+  <div style={{ marginTop: 14 }}>
+    <h4>Game Result:</h4>
+    <p>
+      Winner: {selectedGameResult.winnerName} (roll{" "}
+      {selectedGameResult.highest})
+    </p>
+
+    <ul>
+      {selectedGameResult.players.map(p => (
+        <li key={p.id}>
+          {p.name}: rolled {p.roll}
+        </li>
+      ))}
+    </ul>
+
+    {/* Show all rounds including tie-breaker rerolls, if we have them */}
+    {Array.isArray((selectedGameResult as any).rounds) &&
+      (selectedGameResult as any).rounds.length > 1 && (
+        <div style={{ marginTop: 8, fontSize: 12, color: "#ccc" }}>
+          <div>Rounds (including rerolls):</div>
+          {(selectedGameResult as any).rounds.map(
+            (
+              round: { id: string; name: string; roll: number }[],
+              idx: number
+            ) => (
+              <div key={idx}>
+                Round {idx + 1}:{" "}
+                {round.map(r => `${r.name} (${r.roll})`).join(", ")}
+              </div>
+            )
+          )}
+        </div>
+      )}
   </div>
 )}
+
 {/* Bottom toolbar */}
 <div
   style={{
