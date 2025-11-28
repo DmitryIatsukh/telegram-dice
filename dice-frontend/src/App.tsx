@@ -81,7 +81,7 @@ function DiceApp() {
 // --- bet amount when creating a new lobby ---
 
 const [newLobbyBet, setNewLobbyBet] = useState<number>(1)
-  const [tonBalance, setTonBalance] = useState<number>(100.0)
+  const [tonBalance, setTonBalance] = useState<number>(0)
   const [history, setHistory] = useState<HistoryItem[]>([])
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -216,21 +216,20 @@ useEffect(() => {
       setCurrentUser(null);
     }
   }, []);
-// ---- apply game results to balance (with 5% house rake) ----
+// ---- apply game results to balance (with 5% house rake) + sync wallet ----
 useEffect(() => {
-  if (!currentUser) return;
-  if (!lobbies || lobbies.length === 0) return;
+  if (!currentUser) return
+  if (!lobbies || lobbies.length === 0) return
 
-  // processedResults: string[]
-  const newProcessed = new Set<string>(processedResults);
-  let totalDelta = 0;
-  const newHistory: HistoryItem[] = [];
+  const newProcessed = new Set(processedResults)
+  let totalDelta = 0
+  const newHistory: HistoryItem[] = []
 
   for (const lobby of lobbies) {
-    const gr = lobby.gameResult;
-    if (!gr) continue;
+    const gr = lobby.gameResult
+    if (!gr) continue
 
-    // unique key for this exact finished game
+    // unique key for this finished game
     const key =
       lobby.id +
       ':' +
@@ -238,45 +237,44 @@ useEffect(() => {
       ':' +
       gr.highest +
       ':' +
-      gr.players.map(p => `${p.id}:${p.roll}`).join(',');
+      gr.players.map(p => `${p.id}:${p.roll}`).join(',')
 
-    // already applied => skip
-    if (newProcessed.has(key)) continue;
+    if (newProcessed.has(key)) continue
 
-    const players = gr.players;
-    const nPlayers = players.length;
+    const players = gr.players
+    const nPlayers = players.length
 
     // if current user is not in this game – just mark as processed
     if (!players.some(p => p.id === currentUser.id)) {
-      newProcessed.add(key);
-      continue;
+      newProcessed.add(key)
+      continue
     }
 
-    // base bet for THIS user in this lobby
+    // bet for THIS user in this lobby
     const betBase =
       userBets[lobby.id] ??
-      (typeof lobby.betAmount === 'number' ? lobby.betAmount : 0);
+      (typeof lobby.betAmount === 'number' ? lobby.betAmount : 0)
 
     if (!betBase || betBase <= 0) {
-      newProcessed.add(key);
-      continue;
+      newProcessed.add(key)
+      continue
     }
 
-    const isWinner = gr.winnerId === currentUser.id;
+    const isWinner = gr.winnerId === currentUser.id
 
-    // total pot is betBase * nPlayers
-    const totalPot = betBase * nPlayers;
+    // total pot = bet * number of players
+    const totalPot = betBase * nPlayers
 
-    // house rake is 5% of total pot, but only applied if user wins
-    const rake = isWinner ? totalPot * 0.05 : 0;
+    // house rake 5% of total pot (only taken from winner)
+    const rake = isWinner ? totalPot * 0.05 : 0
 
-    // gross win for the winner = pot - own bet
-    const grossWin = isWinner ? totalPot - betBase : 0;
+    // gross win for winner = pot - own bet
+    const grossWin = isWinner ? totalPot - betBase : 0
 
-    // net balance change for this user
-    const netDelta = isWinner ? grossWin - rake : -betBase;
+    // net delta for this user
+    const netDelta = isWinner ? grossWin - rake : -betBase
 
-    totalDelta += netDelta;
+    totalDelta += netDelta
 
     newHistory.push({
       id: Date.now() + lobby.id + Math.random(),
@@ -286,20 +284,39 @@ useEffect(() => {
       result: isWinner ? 'win' : 'lose',
       createdAt: new Date().toLocaleString(),
       playerName: currentUser.name
-    });
+    })
 
-    // mark this game as processed
-    newProcessed.add(key);
+    newProcessed.add(key)
   }
 
   if (totalDelta !== 0 || newHistory.length > 0) {
-    setTonBalance(prev => prev + totalDelta);
-    setHistory(prev => [...newHistory, ...prev]);
+    const updatedBalance = tonBalance + totalDelta
+    const updatedHistory = [...newHistory, ...history]
+
+    setTonBalance(updatedBalance)
+    setHistory(updatedHistory)
+
+    // sync to backend
+    ;(async () => {
+      try {
+        await fetch(`${API_BASE}/api/wallet/sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegramId: currentUser.id,
+            username: currentUser.username || currentUser.name,
+            balance: updatedBalance,
+            history: updatedHistory
+          })
+        })
+      } catch (e) {
+        console.log('wallet sync error', e)
+      }
+    })()
   }
 
-  // store processed keys as string[]
-  setProcessedResults(Array.from(newProcessed));
-}, [lobbies, currentUser, userBets, processedResults]);
+  setProcessedResults(Array.from(newProcessed))
+}, [lobbies, currentUser, userBets, processedResults, tonBalance, history])
     // ---- lobby actions ----
 
   const createLobby = () => {
@@ -359,10 +376,10 @@ useEffect(() => {
   })
 }
 
-  const joinLobby = (id: number, pin?: string): Promise<Lobby | null> => {
-  if (!currentUser) return Promise.resolve(null)
+  const joinLobby = (id: number, pin?: string) => {
+  if (!currentUser) return
 
-  // 🔎 find this lobby and its bet
+  // try to read bet from local lobby list, fall back to 0.1
   const lobby = lobbies.find(l => l.id === id)
   const lobbyBet = lobby?.betAmount ?? 0.1
 
@@ -371,7 +388,7 @@ useEffect(() => {
     setErrorMessage(
       `You need at least ${lobbyBet.toFixed(2)} TON to join this lobby.`
     )
-    return Promise.resolve(null)
+    return
   }
 
   // Optional: auto-set your bet to the lobby's bet
@@ -380,7 +397,7 @@ useEffect(() => {
     [id]: lobbyBet
   }))
 
-  return fetch(`${API}/lobbies/${id}/join`, {
+  fetch(`${API}/lobbies/${id}/join`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -398,10 +415,9 @@ useEffect(() => {
       return res.json()
     })
     .then((lobby: Lobby | null) => {
-      if (!lobby) return null
+      if (!lobby) return
       setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
       setJoinPin('')
-      return lobby
     })
 }
 
