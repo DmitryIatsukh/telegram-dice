@@ -1529,8 +1529,8 @@ paddingBottom: 100,
 
       {currentPage === 'lobbies' ? renderLobbiesPage() : renderProfilePage()}
 
-      {/* Lobby popup */}
-            {selectedLobby && (
+            {/* Lobby popup */}
+      {selectedLobby && (
         <div
           style={{
             position: 'fixed',
@@ -1826,156 +1826,129 @@ paddingBottom: 100,
               </div>
             </div>
 
+            {/* Game result in popup */}
             {selectedGameResult && (
-  <div style={{ marginTop: 14 }}>
-    <h4>Game Result:</h4>
-    <p>
-      Winner: {selectedGameResult.winnerName} (roll {selectedGameResult.highest})
-    </p>
+              <div style={{ marginTop: 14 }}>
+                <h4>Game Result:</h4>
+                <p>
+                  Winner: {selectedGameResult.winnerName} (roll{' '}
+                  {selectedGameResult.highest})
+                </p>
 
-    <ul>
-      {selectedGameResult.players.map(p => (
-        <li key={p.id}>
-          {p.name}: rolled {p.roll}
-        </li>
-      ))}
-    </ul>
+                <ul>
+                  {selectedGameResult.players.map(p => (
+                    <li key={p.id}>
+                      {p.name}: rolled {p.roll}
+                    </li>
+                  ))}
+                </ul>
 
-    {/* Show all rounds including tie-breakers, if we have them */}
-    {Array.isArray((selectedGameResult as any).rounds) &&
-      (selectedGameResult as any).rounds.length > 1 && (
-        <div style={{ marginTop: 8, fontSize: 12, color: '#ccc' }}>
-          <div>Rounds (including rerolls):</div>
-          {(selectedGameResult as any).rounds.map(
-            (round: { id: string; name: string; roll: number }[], idx: number) => (
-              <div key={idx}>
-                Round {idx + 1}:{' '}
-                {round.map(r => `${r.name} (${r.roll})`).join(', ')}
+                {/* Show all rounds including rerolls, if we have them */}
+                {Array.isArray((selectedGameResult as any).rounds) &&
+                  (selectedGameResult as any).rounds.length > 1 && (
+                    <div style={{ marginTop: 8, fontSize: 12, color: '#ccc' }}>
+                      <div>Rounds (including rerolls):</div>
+                      {(selectedGameResult as any).rounds.map(
+                        (
+                          round: { id: string; name: string; roll: number }[],
+                          idx: number
+                        ) => (
+                          <div key={idx}>
+                            Round {idx + 1}:{' '}
+                            {round
+                              .map(r => `${r.name} (${r.roll})`)
+                              .join(', ')}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  )}
               </div>
-            )
-          )}
+            )}
+          </div>
         </div>
       )}
-  </div>
-)}
 
-{/* Game result in popup */}
-{selectedGameResult && (
-  <div style={{ marginTop: 14 }}>
-    <h4>Game Result:</h4>
-    <p>
-      Winner: {selectedGameResult.winnerName} (roll{" "}
-      {selectedGameResult.highest})
-    </p>
+      {/* Bottom toolbar */}
+      <div
+        style={{
+          position: 'fixed',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          padding: '2px 0 calc(env(safe-area-inset-bottom, 0px) + 4px)',
+          background:
+            'linear-gradient(135deg, rgba(0,40,100,0.96), rgba(0,15,60,0.96))',
+          borderTop: '1px solid rgba(0,140,255,0.35)',
+          display: 'flex',
+          justifyContent: 'center',
+          zIndex: 20
+        }}
+      >
+        <div
+          style={{
+            width: '86%',
+            maxWidth: 380,
+            display: 'flex',
+            gap: 8,
+            padding: 4,
+            borderRadius: 999
+          }}
+        >
+          <button
+            onClick={() => setCurrentPage('lobbies')}
+            style={{
+              flex: 1,
+              padding: '8px 0',
+              borderRadius: 999,
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 14,
+              fontWeight: 600,
+              background:
+                currentPage === 'lobbies'
+                  ? 'linear-gradient(135deg, #4bbaff 0%, #5bc9ff 50%, #84d8ff 100%)'
+                  : 'transparent',
+              color: currentPage === 'lobbies' ? '#000' : '#fff',
+              textAlign: 'center',
+              boxShadow:
+                currentPage === 'lobbies'
+                  ? '0 0 10px rgba(80,180,255,0.6)'
+                  : 'none',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Lobbies
+          </button>
 
-    <ul>
-      {selectedGameResult.players.map(p => (
-        <li key={p.id}>
-          {p.name}: rolled {p.roll}
-        </li>
-      ))}
-    </ul>
-
-    {/* Show all rounds including tie-breaker rerolls, if we have them */}
-    {Array.isArray((selectedGameResult as any).rounds) &&
-      (selectedGameResult as any).rounds.length > 1 && (
-        <div style={{ marginTop: 8, fontSize: 12, color: "#ccc" }}>
-          <div>Rounds (including rerolls):</div>
-          {(selectedGameResult as any).rounds.map(
-            (
-              round: { id: string; name: string; roll: number }[],
-              idx: number
-            ) => (
-              <div key={idx}>
-                Round {idx + 1}:{" "}
-                {round.map(r => `${r.name} (${r.roll})`).join(", ")}
-              </div>
-            )
-          )}
+          <button
+            onClick={() => setCurrentPage('profile')}
+            style={{
+              flex: 1,
+              padding: '8px 0',
+              borderRadius: 999,
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 14,
+              fontWeight: 600,
+              background:
+                currentPage === 'profile'
+                  ? 'linear-gradient(135deg, #4bbaff 0%, #5bc9ff 50%, #84d8ff 100%)'
+                  : 'transparent',
+              color: currentPage === 'profile' ? '#000' : '#fff',
+              textAlign: 'center',
+              boxShadow:
+                currentPage === 'profile'
+                  ? '0 0 10px rgba(80,180,255,0.6)'
+                  : 'none',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Profile
+          </button>
         </div>
-      )}
-  </div>
-)}
+      </div>
 
-{/* Bottom toolbar */}
-<div
-  style={{
-    position: 'fixed',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    padding: '2px 0 calc(env(safe-area-inset-bottom, 0px) + 4px)',
-    background:
-      'linear-gradient(135deg, rgba(0,40,100,0.96), rgba(0,15,60,0.96))',
-    borderTop: '1px solid rgba(0,140,255,0.35)',
-    display: 'flex',
-    justifyContent: 'center',
-    zIndex: 20
-  }}
->
-  <div
-    style={{
-      width: '86%',
-      maxWidth: 380,
-      display: 'flex',
-      gap: 8,
-      padding: 4,
-      borderRadius: 999,
-    }}
-  >
-    <button
-      onClick={() => setCurrentPage('lobbies')}
-      style={{
-        flex: 1,
-        padding: '8px 0',
-        borderRadius: 999,
-        border: 'none',
-        cursor: 'pointer',
-        fontSize: 14,
-        fontWeight: 600,
-        background:
-          currentPage === 'lobbies'
-            ? 'linear-gradient(135deg, #4bbaff 0%, #5bc9ff 50%, #84d8ff 100%)'
-            : 'transparent',
-        color: currentPage === 'lobbies' ? '#000' : '#fff',
-        textAlign: 'center',
-        boxShadow:
-          currentPage === 'lobbies'
-            ? '0 0 10px rgba(80,180,255,0.6)'
-            : 'none',
-        whiteSpace: 'nowrap'
-      }}
-    >
-      Lobbies
-    </button>
-
-    <button
-      onClick={() => setCurrentPage('profile')}
-      style={{
-        flex: 1,
-        padding: '8px 0',
-        borderRadius: 999,
-        border: 'none',
-        cursor: 'pointer',
-        fontSize: 14,
-        fontWeight: 600,
-        background:
-          currentPage === 'profile'
-            ? 'linear-gradient(135deg, #4bbaff 0%, #5bc9ff 50%, #84d8ff 100%)'
-            : 'transparent',
-        color: currentPage === 'profile' ? '#000' : '#fff',
-        textAlign: 'center',
-        boxShadow:
-          currentPage === 'profile'
-            ? '0 0 10px rgba(80,180,255,0.6)'
-            : 'none',
-        whiteSpace: 'nowrap'
-      }}
-    >
-      Profile
-    </button>
-  </div>
-</div>
       {/* Error overlay */}
       {errorMessage && (
         <div
