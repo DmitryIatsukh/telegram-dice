@@ -78,7 +78,7 @@ function DiceApp() {
   const [selectedLobbyId, setSelectedLobbyId] = useState<number | null>(null)
 
   const [createMode, setCreateMode] = useState<'public' | 'private'>('public')
-const [newLobbySize setNewLobbySize] = useState<2 | 4>(4);
+const [newLobbySize setNewLobbySize] = useState<2 | 4>(4)
   const [createPin, setCreatePin] = useState('')
   const [joinPin, setJoinPin] = useState('')
 // --- bet amount when creating a new lobby ---
