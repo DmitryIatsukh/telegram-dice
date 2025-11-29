@@ -84,7 +84,21 @@ function DiceApp() {
   const [createPin, setCreatePin] = useState('')
   const [joinPin, setJoinPin] = useState('')
   const [rollRevealIndex, setRollRevealIndex] = useState<number | null>(null)
-  const [countdown, setCountdown] = useState<number | null>(null)
+  // phase 1: invisible 10s pre-start (show "Starting..." text only)
+const [preStartLobbyId, setPreStartLobbyId] = useState<number | null>(null)
+const [preStartSeconds, setPreStartSeconds] = useState<number>(0)
+
+// phase 2: visible 3-2-1 before rolls
+const [visibleCountdown, setVisibleCountdown] = useState<number | null>(null)
+
+// rolling sequence state
+const [rollingIndex, setRollingIndex] = useState<number | null>(null)
+const [playerRollInfo, setPlayerRollInfo] = useState<
+  Record<string, { roll: number | null; round: number }>
+>({})
+
+  const [myLobbyId, setMyLobbyId] = useState<number | null>(null)
+
 
   // popups
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -101,7 +115,6 @@ function DiceApp() {
   // bet input as string
   const [newLobbyBetInput, setNewLobbyBetInput] = useState<string>('1')
 
-  const [autoStartLobbyId, setAutoStartLobbyId] = useState<number | null>(null)
 
   const [tonBalance, setTonBalance] = useState<number>(0)
   const [history, setHistory] = useState<HistoryItem[]>([])
@@ -113,7 +126,7 @@ function DiceApp() {
   const totalHeld = Object.values(heldBets).reduce((sum, v) => sum + v, 0)
   const availableBalance = tonBalance - totalHeld
 
-  const [processedResults, setProcessedResults] = useState<string[]>([])
+  const [processedLobbyIds, setProcessedLobbyIds] = useState<number[]>([])
   const [currentPage, setCurrentPage] = useState<Page>('lobbies')
   const [depositAmount, setDepositAmount] = useState('')
   const [withdrawAmount, setWithdrawAmount] = useState('')
@@ -168,12 +181,12 @@ function DiceApp() {
         return data.map(l => {
           const prevLobby = prev.find(p => p.id === l.id)
 
-          // what comes from backend (if it has any name at all)
+          // name that comes from backend (if at some point you save it there)
           const backendName =
             l.lobbyName || (l as any).name || ''
 
-          // keep the old name if we already had one
-          const finalName = prevLobby?.lobbyName || backendName
+          // prefer the name we already had in state
+          const finalName = (prevLobby && prevLobby.lobbyName) || backendName
 
           return {
             ...l,
@@ -287,93 +300,93 @@ function DiceApp() {
 
   // apply game results to balance (5% rake) + sync wallet
   useEffect(() => {
-    if (!currentUser) return
-    if (!lobbies || lobbies.length === 0) return
+  if (!currentUser) return
+  if (!lobbies || lobbies.length === 0) return
 
-    const newProcessed = new Set(processedResults)
-    let totalDelta = 0
-    const newHistory: HistoryItem[] = []
+  let totalDelta = 0
+  const newHistory: HistoryItem[] = []
+  const processedSet = new Set(processedLobbyIds)
 
-    for (const lobby of lobbies) {
-      const gr = lobby.gameResult
-      if (!gr) continue
+  for (const lobby of lobbies) {
+    if (lobby.status !== 'finished') continue
+    const gr = lobby.gameResult
+    if (!gr) continue
+    if (processedSet.has(lobby.id)) continue
 
-      const key =
-        lobby.id +
-        ':' +
-        gr.winnerId +
-        ':' +
-        gr.highest +
-        ':' +
-        gr.players.map(p => `${p.id}:${p.roll}`).join(',')
+    const players = gr.players || []
+    if (!players.some(p => p.id === currentUser.id)) {
+      processedSet.add(lobby.id)
+      continue
+    }
 
-      if (newProcessed.has(key)) continue
+    const betBase =
+      userBets[lobby.id] ??
+      (typeof lobby.betAmount === 'number' ? lobby.betAmount : 0)
 
-      const players = gr.players
-      const nPlayers = players.length
+    if (!betBase || betBase <= 0) {
+      processedSet.add(lobby.id)
+      continue
+    }
 
-      if (!players.some(p => p.id === currentUser.id)) {
-        newProcessed.add(key)
-        continue
-      }
+    const nPlayers = players.length
+    const isWinner = gr.winnerId === currentUser.id
+    const totalPot = betBase * nPlayers
+    const rake = isWinner ? totalPot * 0.05 : 0
+    const grossWin = isWinner ? totalPot - betBase : 0
+    const netDelta = isWinner ? grossWin - rake : -betBase
 
-      const betBase =
-        userBets[lobby.id] ??
-        (typeof lobby.betAmount === 'number' ? lobby.betAmount : 0)
+    totalDelta += netDelta
 
-      if (!betBase || betBase <= 0) {
-        newProcessed.add(key)
-        continue
-      }
+    newHistory.push({
+      id: Date.now() + lobby.id + Math.random(),
+      type: 'bet',
+      amount: Math.abs(netDelta),
+      currency: 'TON',
+      result: isWinner ? 'win' : 'lose',
+      createdAt: new Date().toLocaleString(),
+      playerName: currentUser.name
+    })
 
-      const isWinner = gr.winnerId === currentUser.id
-      const totalPot = betBase * nPlayers
-      const rake = isWinner ? totalPot * 0.05 : 0
-      const grossWin = isWinner ? totalPot - betBase : 0
-      const netDelta = isWinner ? grossWin - rake : -betBase
+    processedSet.add(lobby.id)
+  }
 
-      totalDelta += netDelta
+  if (totalDelta !== 0 || newHistory.length > 0) {
+    const updatedBalance = Math.max(0, tonBalance + totalDelta)
+    const updatedHistory = [...newHistory, ...history]
 
-      newHistory.push({
-        id: Date.now() + lobby.id + Math.random(),
-        type: 'bet',
-        amount: Math.abs(netDelta),
-        currency: 'TON',
-        result: isWinner ? 'win' : 'lose',
-        createdAt: new Date().toLocaleString(),
-        playerName: currentUser.name
+    setTonBalance(updatedBalance)
+    setHistory(updatedHistory)
+
+    // clear held bets for finished lobbies we just processed
+    setHeldBets(prev => {
+      const copy = { ...prev }
+      processedSet.forEach(id => {
+        if (copy[id]) delete copy[id]
       })
+      return copy
+    })
 
-      newProcessed.add(key)
-    }
-
-    if (totalDelta !== 0 || newHistory.length > 0) {
-      const updatedBalance = tonBalance + totalDelta
-      const updatedHistory = [...newHistory, ...history]
-
-      setTonBalance(updatedBalance)
-      setHistory(updatedHistory)
-
-      ;(async () => {
-        try {
-          await fetch(`${API_BASE}/api/wallet/sync`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              telegramId: currentUser.id,
-              username: currentUser.username || currentUser.name,
-              balance: updatedBalance,
-              history: updatedHistory
-            })
+    ;(async () => {
+      try {
+        await fetch(`${API_BASE}/api/wallet/sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegramId: currentUser.id,
+            username: currentUser.username || currentUser.name,
+            balance: updatedBalance,
+            history: updatedHistory
           })
-        } catch (e) {
-          console.log('wallet sync error', e)
-        }
-      })()
-    }
+        })
+      } catch (e) {
+        console.log('wallet sync error', e)
+      }
+    })()
+  }
 
-    setProcessedResults(Array.from(newProcessed))
-  }, [lobbies, currentUser, userBets, processedResults, tonBalance, history])
+  setProcessedLobbyIds(Array.from(processedSet))
+}, [lobbies, currentUser, userBets, tonBalance, history, processedLobbyIds])
+
 
   // ---- lobby actions ----
 
@@ -446,11 +459,13 @@ function DiceApp() {
 
   setLobbies(prev => [...prev, lobbyWithName])
   setSelectedLobbyId(lobbyWithName.id)
+  setMyLobbyId(lobbyWithName.id)
   setCreatePin('')
   setLobbyName('')
   setCurrentPage('game')
   setIsCreateModalOpen(false)
 
+  // join my own lobby
   setTimeout(() => {
     joinLobby(
       lobbyWithName.id,
@@ -458,11 +473,22 @@ function DiceApp() {
     )
   }, 150)
 })
+
   }
 
   const joinLobby = (id: number, pin?: string) => {
     if (!currentUser) return
-
+ // already in some lobby? disallow joining another
+  const existing = lobbies.find(l =>
+    l.players.some(p => p.id === currentUser.id) ||
+    l.creatorId === currentUser.id
+  )
+  if (existing && existing.id !== id) {
+    setErrorMessage(
+      `You are already in lobby #${existing.id}. Leave it before joining another.`
+    )
+    return
+  }
     const lobby = lobbies.find(l => l.id === id)
     const lobbyBet = lobby?.betAmount ?? 0.1
 
@@ -503,7 +529,9 @@ function DiceApp() {
         setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
         setJoinPin('')
         setSelectedLobbyId(lobby.id)
+        setMyLobbyId(lobby.id)
         setCurrentPage('game')
+
 
         const meNow = lobby.players.find(p => p.id === currentUser.id)
         if (meNow && !heldBets[lobby.id]) {
@@ -572,6 +600,10 @@ function DiceApp() {
             delete copy[id]
             return copy
           })
+          if (!stillIn) {
+  setMyLobbyId(null)
+}
+
         }
       })
   }
@@ -592,6 +624,7 @@ function DiceApp() {
         }
         setLobbies(prev => prev.filter(l => l.id !== id))
         setSelectedLobbyId(null)
+        setMyLobbyId(prev => (prev === id ? null : prev))
 
         setHeldBets(prev => {
           const copy = { ...prev }
@@ -616,58 +649,147 @@ function DiceApp() {
     !!currentUser &&
     !!selectedLobby &&
     currentUser.id === selectedLobby.creatorId
+  // ---- PRE-START (phase 1) ----
+useEffect(() => {
+  if (!currentUser) return
 
-  // auto-start countdown when lobby is full
+  const myLobby =
+    myLobbyId != null
+      ? lobbies.find(l => l.id === myLobbyId) || null
+      : null
+
+  if (!myLobby || myLobby.status !== 'open') {
+    setPreStartLobbyId(null)
+    setPreStartSeconds(0)
+    return
+  }
+
+  const totalPlayers = myLobby.players.length
+  const minPlayers = 2
+
+  // not enough players -> cancel pre-start
+  if (totalPlayers < minPlayers) {
+    setPreStartLobbyId(null)
+    setPreStartSeconds(0)
+    return
+  }
+
+  // enough players and no pre-start running -> start 10s
+  if (preStartLobbyId !== myLobby.id) {
+    setPreStartLobbyId(myLobby.id)
+    setPreStartSeconds(10)
+    return
+  }
+}, [lobbies, myLobbyId, currentUser, preStartLobbyId])
+
+  
+  // auto-detect the lobby I'm in (creator or player)
+useEffect(() => {
+  if (!currentUser) {
+    setMyLobbyId(null)
+    return
+  }
+
+  const mine = lobbies.find(
+    l =>
+      l.creatorId === currentUser.id ||
+      l.players.some(p => p.id === currentUser.id)
+  )
+
+  setMyLobbyId(mine ? mine.id : null)
+}, [lobbies, currentUser])
+
+
   useEffect(() => {
-    if (!selectedLobby) return
+  if (!preStartLobbyId || preStartSeconds <= 0) return
 
-    const totalPlayers =
-      1 +
-      selectedLobby.players.filter(p => p.id !== selectedLobby.creatorId)
-        .length
+  const timer = setTimeout(() => {
+    setPreStartSeconds(s => s - 1)
+  }, 1000)
 
-    const hasMax =
-      selectedLobby.maxPlayers != null
-        ? totalPlayers >= selectedLobby.maxPlayers
-        : totalPlayers >= 2
+  return () => clearTimeout(timer)
+}, [preStartLobbyId, preStartSeconds])
 
-    if (
-      selectedLobby.status === 'open' &&
-      hasMax &&
-      !selectedLobby.gameResult &&
-      autoStartLobbyId !== selectedLobby.id &&
-      countdown === null
-    ) {
-      setAutoStartLobbyId(selectedLobby.id)
-      setCountdown(10)
+useEffect(() => {
+  if (!preStartLobbyId || preStartSeconds > 0) return
+
+  const myLobby =
+    myLobbyId != null
+      ? lobbies.find(l => l.id === myLobbyId) || null
+      : null
+
+  if (!myLobby || myLobby.status !== 'open') {
+    setPreStartLobbyId(null)
+    return
+  }
+
+  // phase 1 finished -> call start and go into visible countdown
+  setPreStartLobbyId(null)
+
+  // start visible countdown 3..2..1
+  setVisibleCountdown(3)
+  startGame(myLobby.id)
+}, [preStartLobbyId, preStartSeconds, myLobbyId, lobbies])
+
+  // visible 3-2-1 countdown
+useEffect(() => {
+  if (visibleCountdown === null) return
+  if (visibleCountdown <= 0) return
+
+  const t = setTimeout(
+    () => setVisibleCountdown(c => (c === null ? null : c - 1)),
+    1000
+  )
+  return () => clearTimeout(t)
+}, [visibleCountdown])
+
+// when countdown finished and gameResult exists -> simulate rolling
+useEffect(() => {
+  if (visibleCountdown !== 0) return
+
+  // find my lobby with result
+  const myLobby =
+    myLobbyId != null
+      ? lobbies.find(l => l.id === myLobbyId) || null
+      : null
+
+  if (!myLobby || !myLobby.gameResult) return
+
+  const players = myLobby.gameResult.players
+  if (!players || players.length === 0) return
+
+  // initialize roll info (round 1)
+  const initial: Record<string, { roll: number | null; round: number }> = {}
+  players.forEach(p => {
+    initial[p.id] = { roll: null, round: 1 }
+  })
+  setPlayerRollInfo(initial)
+
+  let idx = 0
+  setRollingIndex(0)
+
+  const interval = setInterval(() => {
+    const player = players[idx]
+    const finalRoll = player.roll
+
+    setPlayerRollInfo(prev => ({
+      ...prev,
+      [player.id]: { roll: finalRoll, round: 1 }
+    }))
+
+    idx += 1
+    if (idx >= players.length) {
+      clearInterval(interval)
+      setRollingIndex(null)
+      setVisibleCountdown(null)
+    } else {
+      setRollingIndex(idx)
     }
-  }, [selectedLobby, autoStartLobbyId, countdown])
+  }, 4000) // 4s per player
 
-  // tick countdown and call /start
-  useEffect(() => {
-    if (
-      countdown === null ||
-      !selectedLobby ||
-      autoStartLobbyId !== selectedLobby.id
-    ) {
-      return
-    }
+  return () => clearInterval(interval)
+}, [visibleCountdown, myLobbyId, lobbies])
 
-    if (countdown <= 0) {
-      if (currentUser && currentUser.id === selectedLobby.creatorId) {
-        startGame(selectedLobby.id)
-      }
-      setCountdown(null)
-      setAutoStartLobbyId(null)
-      return
-    }
-
-    const t = setTimeout(
-      () => setCountdown(c => (c === null ? null : c - 1)),
-      1000
-    )
-    return () => clearTimeout(t)
-  }, [countdown, selectedLobby, autoStartLobbyId, currentUser])
 
   // reveal rolls one by one
   useEffect(() => {
@@ -1404,18 +1526,28 @@ function DiceApp() {
 
   // ---- single game / lobby page ----
   const renderGamePage = () => {
-    if (!selectedLobby) {
-      return (
-        <div style={{ padding: 16 }}>
-          <p style={{ fontSize: 14 }}>
-            You are not in any lobby yet. Go to the Lobbies tab and join or
-            create one.
-          </p>
-        </div>
-      )
-    }
+   const myLobby =
+  myLobbyId != null
+    ? lobbies.find(l => l.id === myLobbyId) || null
+    : null
 
-    const gameFinished = selectedLobby.status === 'finished'
+const lobbyForGame = myLobby || selectedLobby
+
+if (!lobbyForGame) {
+  return (
+    <div style={{ padding: 16 }}>
+      <p style={{ fontSize: 14 }}>
+        You are not in any lobby yet. Go to the Lobbies tab and join or create
+        one.
+      </p>
+    </div>
+  )
+}
+
+const selectedLobby = lobbyForGame // keep rest of code working
+
+const gameFinished = selectedLobby.status === 'finished'
+
     const selectedGameResult = selectedLobby.gameResult
 
     const gameLobbyTitle = (
@@ -1491,13 +1623,96 @@ function DiceApp() {
           ].join(', ')}
         </p>
 
-        {renderLobbyVsRow(selectedLobby)}
+        {/* Player list with rolling/rolled states */}
+<div
+  style={{
+    marginTop: 12,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 14
+  }}
+>
+  {selectedLobby.players.map((p, idx) => {
+    const info = playerRollInfo[p.id]
+    const isRolling =
+      rollingIndex !== null &&
+      selectedLobby.gameResult &&
+      selectedLobby.gameResult.players[rollingIndex].id === p.id
 
-        {selectedLobby.status === 'open' && countdown !== null && (
-          <p style={{ fontSize: 14, color: '#facc15', marginTop: 8 }}>
-            Game starts in <b>{countdown}</b> seconds…
-          </p>
-        )}
+    return (
+      <div
+        key={p.id}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10
+        }}
+      >
+        {/* Avatar */}
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: '50%',
+            overflow: 'hidden',
+            background: 'rgba(255,255,255,0.08)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}
+        >
+          {currentUser?.id === p.id && currentUser.avatarUrl ? (
+            <img
+              src={currentUser.avatarUrl}
+              alt={p.name}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          ) : (
+            <span style={{ fontWeight: 700, fontSize: 16 }}>
+              {p.name.charAt(0).toUpperCase()}
+            </span>
+          )}
+        </div>
+
+        {/* Name + rolling info */}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>{p.name}</span>
+
+          {isRolling && (
+            <span style={{ fontSize: 12, color: '#facc15' }}>
+              rolling…
+            </span>
+          )}
+
+          {!isRolling && info?.roll != null && (
+            <span style={{ fontSize: 12, color: '#9ca3af' }}>
+              rolled {info.roll}
+            </span>
+          )}
+        </div>
+      </div>
+    )
+  })}
+</div>
+
+
+        {/* phase 1: invisible countdown, show only text */}
+{selectedLobby.status === 'open' &&
+  preStartLobbyId === selectedLobby.id &&
+  preStartSeconds > 0 && (
+    <p style={{ fontSize: 14, color: '#facc15', marginTop: 8 }}>
+      Starting…
+    </p>
+  )}
+
+{/* phase 2: visible 3-2-1 */}
+{visibleCountdown !== null &&
+  selectedLobby.status !== 'finished' &&
+  myLobbyId === selectedLobby.id && (
+    <p style={{ fontSize: 24, fontWeight: 700, marginTop: 8 }}>
+      {visibleCountdown > 0 ? visibleCountdown : ''}
+    </p>
+  )}
 
         {selectedLobby.isPrivate && (
           <div style={{ marginTop: 10 }}>
@@ -1530,6 +1745,7 @@ function DiceApp() {
           >
             {!isMeCreator && (
               <button
+                disabled={visibleCountdown !== null}
                 onClick={() =>
                   isMeInLobby
                     ? leaveLobby(selectedLobby.id)
@@ -1560,6 +1776,7 @@ function DiceApp() {
 
             {isMeCreator && (
               <button
+                disabled={visibleCountdown !== null}
                 onClick={() => cancelLobby(selectedLobby.id)}
                 style={{
                   padding: '8px 16px',
