@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   TonConnectUIProvider,
   TonConnectButton,
@@ -83,6 +83,7 @@ function DiceApp() {
   const [joinPin, setJoinPin] = useState('')
   const [rollRevealIndex, setRollRevealIndex] = useState<number | null>(null)
   const [countdown, setCountdown] = useState<number | null>(null)
+const [searchName, setSearchName] = useState('');
   const [autoStartLobbyId, setAutoStartLobbyId] = useState<number | null>(null)
 
   // --- bet amount when creating a new lobby ---
@@ -1342,12 +1343,87 @@ function DiceApp() {
               .map(p => p.name)
           ].join(', ')}
         </p>
+{renderLobbyVsRow(selectedLobby)}
         {selectedLobby.status === 'open' && countdown !== null && (
           <p style={{ fontSize: 14, color: '#facc15', marginTop: 8 }}>
             Game starts in <b>{countdown}</b> seconds…
           </p>
-        )}
+function renderLobbyVsRow(lobby: Lobby) {
+  if (!lobby) return null;
 
+  const creator = {
+    id: lobby.creatorId,
+    name: lobby.creatorName,
+  };
+
+  const others = lobby.players.filter(p => p.id !== lobby.creatorId);
+
+  return (
+    <div
+      style={{
+        marginTop: 16,
+        padding: 12,
+        background: 'rgba(255,255,255,0.05)',
+        borderRadius: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 18,
+      }}
+    >
+      <div style={{ textAlign: 'center' }}>
+        <div
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: '50%',
+            background: '#333',
+            overflow: 'hidden',
+            margin: '0 auto 6px',
+          }}
+        >
+          <img
+            src={
+              creator.id && creator.id === currentUser?.id
+                ? currentUser.avatarUrl
+                : undefined
+            }
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        </div>
+        <div style={{ fontSize: 13 }}>{creator.name}</div>
+      </div>
+
+      <div style={{ fontSize: 22, fontWeight: 700 }}>VS</div>
+
+      <div style={{ display: 'flex', gap: 12 }}>
+        {others.map(p => (
+          <div key={p.id} style={{ textAlign: 'center' }}>
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: '50%',
+                background: '#333',
+                overflow: 'hidden',
+                margin: '0 auto 6px',
+              }}
+            >
+              <img
+                src={
+                  p.id === currentUser?.id ? currentUser.avatarUrl : undefined
+                }
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            </div>
+            <div style={{ fontSize: 12 }}>{p.name}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+        )}
         {selectedLobby.isPrivate && (
           <div style={{ marginTop: 10 }}>
             <span style={{ fontSize: 14 }}>PIN: </span>
@@ -1478,144 +1554,238 @@ function DiceApp() {
     )
   }
 
+// Small "VS" row showing creator + other players as circles with initials
+const renderLobbyVsRow = (lobby: Lobby) => {
+  const creatorName = lobby.creatorName || 'Creator';
+  const creatorPlayer: { id: string; name: string } = {
+    id: lobby.creatorId || 'creator',
+    name: creatorName,
+  };
+
+  const otherPlayers = lobby.players
+    .filter(p => p.id !== lobby.creatorId)
+    .slice(0, 3); // show up to 3 others
+
+  const all = [creatorPlayer, ...otherPlayers];
+
+  if (all.length === 0) return null;
+
+  return (
+    <div
+      style={{
+        marginTop: 8,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        flexWrap: 'wrap',
+      }}
+    >
+      {all.map((p, idx) => (
+        <React.Fragment key={p.id + '-' + idx}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              minWidth: 60,
+            }}
+          >
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.06)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 14,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+              }}
+            >
+              {p.name.charAt(0).toUpperCase()}
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                marginTop: 3,
+                textAlign: 'center',
+                color: '#e5e7eb',
+                maxWidth: 80,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {p.name}
+            </div>
+          </div>
+          {idx < all.length - 1 && (
+            <span style={{ fontSize: 11, opacity: 0.7 }}>vs</span>
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+};
+// Lobbies visible after search filter
+const visibleLobbies = lobbies.filter(lobby => {
+  const q = searchName.trim().toLowerCase();
+  if (!q) return true;
+
+  const creatorMatch = (lobby.creatorName || '')
+    .toLowerCase()
+    .includes(q);
+
+  const playersMatch = lobby.players.some(p =>
+    p.name.toLowerCase().includes(q)
+  );
+
+  return creatorMatch || playersMatch;
+});
   // ---- lobbies page ----
 
   const renderLobbiesPage = () => (
-    <>
+  <>
+    <div
+      style={{
+        margin: '10px 0 20px',
+        padding: 10,
+        background: 'rgba(0,20,60,0.85)',
+        borderRadius: 12,
+        border: '1px solid rgba(0,120,255,0.2)',
+        boxShadow: '0 0 18px rgba(0,80,255,0.25)',
+      }}
+    >
+      {/* CREATE LOBBY CONTROLS */}
       <div
         style={{
-          margin: '10px 0 20px',
-          padding: 10,
-          background: 'rgba(0,20,60,0.85)',
-          borderRadius: 12,
-          border: '1px solid rgba(0,120,255,0.2)',
-          boxShadow: '0 0 18px rgba(0,80,255,0.25)'
+          display: 'flex',
+          gap: 12,
+          alignItems: 'center',
+          marginBottom: 8,
         }}
       >
-        <div
+        <span style={{ fontSize: 13, color: '#ccc' }}>Lobby type:</span>
+        <label
           style={{
             display: 'flex',
-            gap: 12,
             alignItems: 'center',
-            marginBottom: 8
+            gap: 4,
+            fontSize: 13,
           }}
         >
-          <span style={{ fontSize: 13, color: '#ccc' }}>Lobby type:</span>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 13
-            }}
-          >
-            <input
-              type='radio'
-              checked={createMode === 'public'}
-              onChange={() => setCreateMode('public')}
-            />
-            Public
-          </label>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 13
-            }}
-          >
-            <input
-              type='radio'
-              checked={createMode === 'private'}
-              onChange={() => setCreateMode('private')}
-            />
-            Private
-          </label>
-        </div>
-
-        {createMode === 'private' && (
-          <div style={{ marginBottom: 8 }}>
-            <span style={{ fontSize: 13 }}>PIN (4 digits): </span>
-            <input
-              type='password'
-              value={createPin}
-              maxLength={4}
-              onChange={e =>
-                setCreatePin(e.target.value.replace(/\D/g, ''))
-              }
-              style={{
-                padding: '4px 8px',
-                borderRadius: 6,
-                border: '1px solid #555',
-                background: '#050511',
-                color: '#fff',
-                width: 80
-              }}
-            />
-          </div>
-        )}
-
-        <div style={{ marginBottom: 8 }}>
-          <span style={{ fontSize: 13, marginRight: 8 }}>Lobby size:</span>
-          <label
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 13,
-              marginRight: 10
-            }}
-          >
-            <input
-              type='radio'
-              checked={newLobbySize === 2}
-              onChange={() => setNewLobbySize(2)}
-            />
-            2 players
-          </label>
-          <label
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 13
-            }}
-          >
-            <input
-              type='radio'
-              checked={newLobbySize === 4}
-              onChange={() => setNewLobbySize(4)}
-            />
-            4 players
-          </label>
-        </div>
-
-        <div style={{ marginBottom: 8 }}>
-          <span style={{ fontSize: 13 }}>Bet amount (TON): </span>
           <input
-            type='number'
-            step={0.1}
-            placeholder='0.1 eg'
-            value={newLobbyBet === 0 ? '' : newLobbyBet}
-            onChange={e => {
-              const v = e.target.value
-              if (v === '') {
-                setNewLobbyBet(0)
-              } else {
-                setNewLobbyBet(Number(v))
-              }
-            }}
+            type="radio"
+            checked={createMode === 'public'}
+            onChange={() => setCreateMode('public')}
+          />
+          Public
+        </label>
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            fontSize: 13,
+          }}
+        >
+          <input
+            type="radio"
+            checked={createMode === 'private'}
+            onChange={() => setCreateMode('private')}
+          />
+          Private
+        </label>
+      </div>
+
+      {createMode === 'private' && (
+        <div style={{ marginBottom: 8 }}>
+          <span style={{ fontSize: 13 }}>PIN (4 digits): </span>
+          <input
+            type="password"
+            value={createPin}
+            maxLength={4}
+            onChange={e =>
+              setCreatePin(e.target.value.replace(/\D/g, ''))
+            }
             style={{
               padding: '4px 8px',
               borderRadius: 6,
               border: '1px solid #555',
               background: '#050511',
               color: '#fff',
-              width: 100
+              width: 80,
             }}
           />
         </div>
+      )}
 
+      {/* Lobby size: 2 or 4 players */}
+      <div style={{ marginBottom: 8 }}>
+        <span style={{ fontSize: 13, marginRight: 8 }}>Lobby size:</span>
+        <label
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            fontSize: 13,
+            marginRight: 10,
+          }}
+        >
+          <input
+            type="radio"
+            checked={newLobbySize === 2}
+            onChange={() => setNewLobbySize(2)}
+          />
+          2 players
+        </label>
+        <label
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            fontSize: 13,
+          }}
+        >
+          <input
+            type="radio"
+            checked={newLobbySize === 4}
+            onChange={() => setNewLobbySize(4)}
+          />
+          4 players
+        </label>
+      </div>
+
+      {/* Bet amount for new lobby */}
+      <div style={{ marginBottom: 8 }}>
+        <span style={{ fontSize: 13 }}>Bet amount (TON): </span>
+        <input
+          type="number"
+          step={0.1}
+          placeholder="0.1 eg"
+          value={newLobbyBet === 0 ? '' : newLobbyBet}
+          onChange={e => {
+            const v = e.target.value
+            if (v === '') {
+              setNewLobbyBet(0)
+            } else {
+              setNewLobbyBet(Number(v))
+            }
+          }}
+          style={{
+            padding: '4px 8px',
+            borderRadius: 6,
+            border: '1px solid #555',
+            background: '#050511',
+            color: '#fff',
+            width: 100,
+          }}
+        />
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button
           onClick={createLobby}
           style={{
@@ -1628,7 +1798,7 @@ function DiceApp() {
             cursor: 'pointer',
             fontWeight: 700,
             fontSize: 14,
-            boxShadow: '0 0 14px rgba(255,0,128,0.8)'
+            boxShadow: '0 0 14px rgba(255,0,128,0.8)',
           }}
         >
           Create Lobby
@@ -1638,123 +1808,203 @@ function DiceApp() {
           onClick={loadLobbies}
           style={{
             padding: '8px 14px',
-            marginLeft: 10,
             background: 'rgba(255,255,255,0.04)',
             color: '#fff',
             border: '1px solid rgba(255,255,255,0.14)',
             borderRadius: 999,
             cursor: 'pointer',
-            fontSize: 13
+            fontSize: 13,
           }}
         >
-          Refresh now
+          Refresh
         </button>
       </div>
 
-      <h2 style={{ marginTop: 10, marginBottom: 8 }}>Lobbies:</h2>
-
-      {lobbies.length === 0 && <p>No lobbies yet</p>}
-
-      {lobbies.map(lobby => (
+      {/* SEARCH CONTROLS */}
+      <div
+        style={{
+          marginTop: 12,
+          paddingTop: 10,
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+        }}
+      >
         <div
-          key={lobby.id}
           style={{
-            padding: 12,
-            marginBottom: 10,
-            background:
-              'linear-gradient(135deg, rgba(0,30,80,0.9), rgba(0,15,40,0.95))',
-            borderRadius: 10,
-            border: '1px solid rgba(0,120,255,0.25)',
-            boxShadow: '0 0 14px rgba(0,80,255,0.4)'
+            fontSize: 12,
+            marginBottom: 4,
+            color: '#e5e7eb',
           }}
         >
-          <h3 style={{ marginBottom: 4 }}>
-            Lobby #{lobby.id}{' '}
-            {lobby.isPrivate && (
-              <span
-                style={{
-                  fontSize: 11,
-                  background:
-                    'linear-gradient(135deg, #ff4d6a 0%, #ff9a9e 100%)',
-                  padding: '2px 8px',
-                  borderRadius: 999,
-                  marginLeft: 6,
-                  color: '#111',
-                  fontWeight: 600
-                }}
-              >
-                Private
-              </span>
-            )}
-          </h3>
-          <p style={{ fontSize: 13, color: '#ccc' }}>Status: {lobby.status}</p>
-          <p style={{ fontSize: 13, color: '#ccc' }}>
-            Creator: {lobby.creatorName || 'not set yet (no players)'}
-          </p>
-          <p style={{ fontSize: 13, color: '#ccc' }}>
-            Players: {lobby.players.length}
-            {lobby.maxPlayers ? ` / ${lobby.maxPlayers}` : ''}
-          </p>
-          <p style={{ fontSize: 13, color: '#ccc' }}>
-            Bet: {(lobby.betAmount ?? 1).toFixed(2)} TON
-          </p>
-
-          {lobby.status === 'finished' && lobby.gameResult && (
-            <div style={{ marginTop: 6, fontSize: 12 }}>
-              <div style={{ color: '#bbf7d0' }}>
-                Winner:{' '}
-                <span style={{ fontWeight: 700 }}>
-                  {lobby.gameResult.winnerName}
-                </span>{' '}
-                (roll {lobby.gameResult.highest})
-              </div>
-
-              {currentUser && (() => {
-                const me = lobby.gameResult!.players.find(
-                  p => p.id === currentUser.id
-                )
-                if (!me) return null
-                const didWin =
-                  lobby.gameResult!.winnerId === currentUser.id
-                return (
-                  <div
-                    style={{
-                      marginTop: 2,
-                      color: didWin ? '#22c55e' : '#f97316'
-                    }}
-                  >
-                    You {didWin ? 'won' : 'lost'} with roll {me.roll}
-                  </div>
-                )
-              })()}
-            </div>
-          )}
-
-          <button
-            onClick={() => {
-              setSelectedLobbyId(lobby.id)
-              setCurrentPage('game')
-            }}
+          Search lobbies by username (creator or player)
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            gap: 6,
+            flexWrap: 'wrap',
+            alignItems: 'center',
+          }}
+        >
+          <input
+            placeholder="Type username or name..."
+            value={searchName}
+            onChange={e => setSearchName(e.target.value)}
             style={{
-              padding: '7px 16px',
-              background:
-                'linear-gradient(135deg, #00d4ff 0%, #0074ff 60%, #4a00e0 100%)',
+              flex: '1 1 140px',
+              minWidth: 140,
+              padding: '4px 8px',
+              borderRadius: 6,
+              border: '1px solid #555',
+              background: '#050511',
               color: '#fff',
-              border: 'none',
+              fontSize: 12,
+            }}
+          />
+          <button
+            onClick={loadLobbies} // refresh from backend, filter is live
+            style={{
+              padding: '6px 10px',
               borderRadius: 999,
+              border: 'none',
+              background:
+                'linear-gradient(135deg, #4bbaff 0%, #5bc9ff 50%, #84d8ff 100%)',
+              color: '#000',
+              fontSize: 12,
+              fontWeight: 700,
               cursor: 'pointer',
-              marginTop: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              boxShadow: '0 0 12px rgba(0,116,255,0.8)'
+              whiteSpace: 'nowrap',
             }}
           >
-            {lobby.status === 'finished' ? 'View result' : 'Open Lobby'}
+            Search
           </button>
+          {searchName && (
+            <button
+              onClick={() => setSearchName('')}
+              style={{
+                padding: '6px 10px',
+                borderRadius: 999,
+                border: 'none',
+                background: 'rgba(255,255,255,0.06)',
+                color: '#fff',
+                fontSize: 12,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Clear
+            </button>
+          )}
         </div>
-      ))}
-    </>
-  )
+      </div>
+    </div>
+
+    <h2 style={{ marginTop: 10, marginBottom: 8 }}>Lobbies:</h2>
+
+    {visibleLobbies.length === 0 && <p>No lobbies match your search</p>}
+
+    {visibleLobbies.map(lobby => (
+      <div
+        key={lobby.id}
+        style={{
+          padding: 12,
+          marginBottom: 10,
+          background:
+            'linear-gradient(135deg, rgba(0,30,80,0.9), rgba(0,15,40,0.95))',
+          borderRadius: 10,
+          border: '1px solid rgba(0,120,255,0.25)',
+          boxShadow: '0 0 14px rgba(0,80,255,0.4)',
+        }}
+      >
+        <h3 style={{ marginBottom: 4 }}>
+          Lobby #{lobby.id}{' '}
+          {lobby.isPrivate && (
+            <span
+              style={{
+                fontSize: 11,
+                background:
+                  'linear-gradient(135deg, #ff4d6a 0%, #ff9a9e 100%)',
+                padding: '2px 8px',
+                borderRadius: 999,
+                marginLeft: 6,
+                color: '#111',
+                fontWeight: 600,
+              }}
+            >
+              Private
+            </span>
+          )}
+        </h3>
+        <p style={{ fontSize: 13, color: '#ccc' }}>Status: {lobby.status}</p>
+        <p style={{ fontSize: 13, color: '#ccc' }}>
+          Creator: {lobby.creatorName || 'not set yet (no players)'}
+        </p>
+        <p style={{ fontSize: 13, color: '#ccc' }}>
+          Players: {lobby.players.length}
+          {lobby.maxPlayers ? ` / ${lobby.maxPlayers}` : ''}
+        </p>
+        <p style={{ fontSize: 13, color: '#ccc' }}>
+          Bet: {(lobby.betAmount ?? 1).toFixed(2)} TON
+        </p>
+
+        {/* VS avatars row */}
+        {renderLobbyVsRow(lobby)}
+
+        {lobby.status === 'finished' && lobby.gameResult && (
+          <div style={{ marginTop: 6, fontSize: 12 }}>
+            <div style={{ color: '#bbf7d0' }}>
+              Winner:{' '}
+              <span style={{ fontWeight: 700 }}>
+                {lobby.gameResult.winnerName}
+              </span>{' '}
+              (roll {lobby.gameResult.highest})
+            </div>
+
+            {currentUser && (() => {
+              const me = lobby.gameResult!.players.find(
+                p => p.id === currentUser.id,
+              )
+              if (!me) return null
+              const didWin =
+                lobby.gameResult!.winnerId === currentUser.id
+              return (
+                <div
+                  style={{
+                    marginTop: 2,
+                    color: didWin ? '#22c55e' : '#f97316',
+                  }}
+                >
+                  You {didWin ? 'won' : 'lost'} with roll {me.roll}
+                </div>
+              )
+            })()}
+          </div>
+        )}
+
+        <button
+          onClick={() => {
+            setSelectedLobbyId(lobby.id)
+            setCurrentPage('game')
+          }}
+          style={{
+            padding: '7px 16px',
+            background:
+              'linear-gradient(135deg, #00d4ff 0%, #0074ff 60%, #4a00e0 100%)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 999,
+            cursor: 'pointer',
+            marginTop: 8,
+            fontSize: 13,
+            fontWeight: 600,
+            boxShadow: '0 0 12px rgba(0,116,255,0.8)',
+          }}
+        >
+          {lobby.status === 'finished' ? 'View result' : 'Open Lobby'}
+        </button>
+      </div>
+    ))}
+  </>
+);
 
   // ---- banner info: GLOBAL wins from all finished lobbies ----
   const finishedLobbies = lobbies.filter(
