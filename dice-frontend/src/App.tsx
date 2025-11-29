@@ -1524,7 +1524,7 @@ useEffect(() => {
     const gameFinished = lobbyForGame.status === 'finished'
     const selectedGameResult = lobbyForGame.gameResult
 
-    const gameLobbyTitle = (lobbyForGame.lobbyName '').trim()
+    const gameLobbyTitle = (lobbyForGame.lobbyName || '').trim()
 
     const gameLabel = gameLobbyTitle
       ? `Lobby: ${gameLobbyTitle}`
