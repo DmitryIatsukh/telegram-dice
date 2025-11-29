@@ -35,6 +35,7 @@ type Lobby = {
   betAmount?: number
   maxPlayers?: number
   gameResult: GameResult
+name?: string // NEW: lobby name
 }
 
 type HistoryItem = {
@@ -82,7 +83,17 @@ function DiceApp() {
   const [joinPin, setJoinPin] = useState('')
   const [rollRevealIndex, setRollRevealIndex] = useState<number | null>(null)
   const [countdown, setCountdown] = useState<number | null>(null)
-  const [searchName, setSearchName] = useState('')
+    // POPUPS
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
+
+  // Create lobby: lobby name
+  const [lobbyName, setLobbyName] = useState('')
+
+  // Search filters
+  const [searchText, setSearchText] = useState('')
+  const [searchBetMinInput, setSearchBetMinInput] = useState('')
+  const [searchSize, setSearchSize] = useState<'any' | 2 | 4>('any')
 
   // store bet as STRING so user can type "0.1" normally
   const [newLobbyBetInput, setNewLobbyBetInput] = useState<string>('1')
@@ -374,6 +385,7 @@ function DiceApp() {
       body: JSON.stringify({
         userId: currentUser.id,
         name: currentUser.username || currentUser.name,
+lobbyName,  
         isPrivate: createMode === 'private',
         pin: createMode === 'private' ? createPin : undefined,
         betAmount: betToSend,
@@ -398,6 +410,7 @@ function DiceApp() {
         setSelectedLobbyId(lobby.id)
         setCreatePin('')
         setCurrentPage('game')
+setIsCreateModalOpen(false) // NEW
 
         if (currentUser) {
           setTimeout(() => {
@@ -1564,25 +1577,64 @@ function DiceApp() {
     )
   }
 
-  // ---- lobbies page ----
-  const visibleLobbies = lobbies.filter(lobby => {
-    const q = searchName.trim().toLowerCase()
-    if (!q) return true
+    // ---- FILTERS for lobbies (search) ----
 
-    const creatorMatch = (lobby.creatorName || '').toLowerCase().includes(q)
+  const isSearchEmpty =
+    !searchText.trim() &&
+    !searchBetMinInput.trim() &&
+    searchSize === 'any'
 
-    const playersMatch = lobby.players.some(p =>
-      p.name.toLowerCase().includes(q)
-    )
+  const matchesFilters = (lobby: Lobby) => {
+    // TEXT filter (lobby name, creator, players)
+    const q = searchText.trim().toLowerCase()
+    if (q) {
+      const nameMatch = (lobby.name || '').toLowerCase().includes(q)
+      const creatorMatch = (lobby.creatorName || '')
+        .toLowerCase()
+        .includes(q)
+      const playersMatch = lobby.players.some(p =>
+        p.name.toLowerCase().includes(q)
+      )
+      if (!nameMatch && !creatorMatch && !playersMatch) return false
+    }
 
-    return creatorMatch || playersMatch
-  })
+    // BET filter (min bet)
+    if (searchBetMinInput.trim()) {
+      const minBet = Number(searchBetMinInput.replace(',', '.'))
+      if (!isNaN(minBet) && minBet > 0) {
+        const bet = lobby.betAmount ?? 0
+        if (bet < minBet) return false
+      }
+    }
 
+    // SIZE filter
+    if (searchSize !== 'any') {
+      const size = lobby.maxPlayers ?? lobby.players.length
+      if (size !== searchSize) return false
+    }
+
+    return true
+  }
+
+  const visibleLobbies = lobbies.filter(matchesFilters)
+
+  // ACTIVE lobbies counting (status === 'open')
+  const totalActiveLobbies = lobbies.filter(l => l.status === 'open').length
+  const filteredActiveLobbies = lobbies.filter(
+    l => l.status === 'open' && matchesFilters(l)
+  ).length
+
+  const lobbiesCountToShow = isSearchEmpty
+    ? totalActiveLobbies
+    : filteredActiveLobbies
+
+    // ---- lobbies page ----
   const renderLobbiesPage = () => (
     <>
+      {/* HEADER with Create / Search + count */}
       <div
         style={{
-          margin: '10px 0 20px',
+          margin: '10px 0 14px',
           padding: 10,
           background: 'rgba(0,20,60,0.85)',
           borderRadius: 12,
@@ -1593,125 +1645,35 @@ function DiceApp() {
         <div
           style={{
             display: 'flex',
-            gap: 12,
-            alignItems: 'center',
-            marginBottom: 8
+            justifyContent: 'space-between',
+            gap: 10,
+            marginBottom: 4
           }}
         >
-          <span style={{ fontSize: 13, color: '#ccc' }}>Lobby type:</span>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 13
-            }}
-          >
-            <input
-              type='radio'
-              checked={createMode === 'public'}
-              onChange={() => setCreateMode('public')}
-            />
-            Public
-          </label>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 13
-            }}
-          >
-            <input
-              type='radio'
-              checked={createMode === 'private'}
-              onChange={() => setCreateMode('private')}
-            />
-            Private
-          </label>
-        </div>
-
-        {createMode === 'private' && (
-          <div style={{ marginBottom: 8 }}>
-            <span style={{ fontSize: 13 }}>PIN (4 digits): </span>
-            <input
-              type='password'
-              value={createPin}
-              maxLength={4}
-              onChange={e =>
-                setCreatePin(e.target.value.replace(/\D/g, ''))
-              }
-              style={{
-                padding: '4px 8px',
-                borderRadius: 6,
-                border: '1px solid #555',
-                background: '#050511',
-                color: '#fff',
-                width: 80
-              }}
-            />
-          </div>
-        )}
-
-        <div style={{ marginBottom: 8 }}>
-          <span style={{ fontSize: 13, marginRight: 8 }}>Lobby size:</span>
-          <label
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 13,
-              marginRight: 10
-            }}
-          >
-            <input
-              type='radio'
-              checked={newLobbySize === 2}
-              onChange={() => setNewLobbySize(2)}
-            />
-            2 players
-          </label>
-          <label
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 13
-            }}
-          >
-            <input
-              type='radio'
-              checked={newLobbySize === 4}
-              onChange={() => setNewLobbySize(4)}
-            />
-            4 players
-          </label>
-        </div>
-
-        <div style={{ marginBottom: 8 }}>
-          <span style={{ fontSize: 13 }}>Bet amount (TON): </span>
-          <input
-            type='number'
-            step={0.1}
-            placeholder='0.1 eg'
-            value={newLobbyBetInput}
-            onChange={e => setNewLobbyBetInput(e.target.value)}
-            style={{
-              padding: '4px 8px',
-              borderRadius: 6,
-              border: '1px solid #555',
-              background: '#050511',
-              color: '#fff',
-              width: 100
-            }}
-          />
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
-            onClick={createLobby}
+            onClick={() => setIsSearchModalOpen(true)}
             style={{
-              padding: '9px 18px',
+              flex: 1,
+              padding: '9px 0',
+              background:
+                'linear-gradient(135deg, #4bbaff 0%, #5bc9ff 50%, #84d8ff 100%)',
+              color: '#000',
+              border: 'none',
+              borderRadius: 999,
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: 14,
+              boxShadow: '0 0 12px rgba(80,180,255,0.7)'
+            }}
+          >
+            🔎 Search
+          </button>
+
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            style={{
+              flex: 1,
+              padding: '9px 0',
               background:
                 'linear-gradient(135deg, #ff0080 0%, #ff8c00 50%, #ffe53b 100%)',
               color: '#111',
@@ -1723,103 +1685,39 @@ function DiceApp() {
               boxShadow: '0 0 14px rgba(255,0,128,0.8)'
             }}
           >
-            Create Lobby
-          </button>
-
-          <button
-            onClick={loadLobbies}
-            style={{
-              padding: '8px 14px',
-              background: 'rgba(255,255,255,0.04)',
-              color: '#fff',
-              border: '1px solid rgba(255,255,255,0.14)',
-              borderRadius: 999,
-              cursor: 'pointer',
-              fontSize: 13
-            }}
-          >
-            Refresh
+            ➕ Create
           </button>
         </div>
 
         <div
           style={{
-            marginTop: 12,
-            paddingTop: 10,
-            borderTop: '1px solid rgba(255,255,255,0.08)'
+            marginTop: 4,
+            fontSize: 12,
+            color: '#e5e7eb',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
           }}
         >
-          <div
+          <span>{lobbiesCountToShow} lobbies</span>
+          <button
+            onClick={loadLobbies}
             style={{
-              fontSize: 12,
-              marginBottom: 4,
-              color: '#e5e7eb'
+              fontSize: 11,
+              padding: '3px 8px',
+              borderRadius: 999,
+              border: '1px solid rgba(255,255,255,0.25)',
+              background: 'rgba(255,255,255,0.03)',
+              color: '#fff',
+              cursor: 'pointer'
             }}
           >
-            Search lobbies by username (creator or player)
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              gap: 6,
-              flexWrap: 'wrap',
-              alignItems: 'center'
-            }}
-          >
-            <input
-              placeholder='Type username or name...'
-              value={searchName}
-              onChange={e => setSearchName(e.target.value)}
-              style={{
-                flex: '1 1 140px',
-                minWidth: 140,
-                padding: '4px 8px',
-                borderRadius: 6,
-                border: '1px solid #555',
-                background: '#050511',
-                color: '#fff',
-                fontSize: 12
-              }}
-            />
-            <button
-              onClick={loadLobbies}
-              style={{
-                padding: '6px 10px',
-                borderRadius: 999,
-                border: 'none',
-                background:
-                  'linear-gradient(135deg, #4bbaff 0%, #5bc9ff 50%, #84d8ff 100%)',
-                color: '#000',
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              Search
-            </button>
-            {searchName && (
-              <button
-                onClick={() => setSearchName('')}
-                style={{
-                  padding: '6px 10px',
-                  borderRadius: 999,
-                  border: 'none',
-                  background: 'rgba(255,255,255,0.06)',
-                  color: '#fff',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                Clear
-              </button>
-            )}
-          </div>
+            Refresh
+          </button>
         </div>
       </div>
 
-      <h2 style={{ marginTop: 10, marginBottom: 8 }}>Lobbies:</h2>
+      <h2 style={{ marginTop: 4, marginBottom: 8 }}>Lobbies:</h2>
 
       {visibleLobbies.length === 0 && <p>No lobbies match your search</p>}
 
@@ -1837,7 +1735,9 @@ function DiceApp() {
           }}
         >
           <h3 style={{ marginBottom: 4 }}>
-            Lobby #{lobby.id}{' '}
+            {lobby.name
+              ? `${lobby.name} (#{lobby.id})`
+              : `Lobby #${lobby.id}`}{' '}
             {lobby.isPrivate && (
               <span
                 style={{
@@ -2051,7 +1951,348 @@ function DiceApp() {
       {currentPage === 'lobbies' && renderLobbiesPage()}
       {currentPage === 'profile' && renderProfilePage()}
       {currentPage === 'game' && renderGamePage()}
+      {/* CREATE LOBBY POPUP */}
+      {isCreateModalOpen && (
+        <div
+          onClick={() => setIsCreateModalOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9998
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'linear-gradient(135deg, #020617, #0b1120)',
+              padding: 16,
+              borderRadius: 16,
+              minWidth: 260,
+              maxWidth: 320,
+              border: '1px solid rgba(96,165,250,0.6)',
+              boxShadow: '0 0 24px rgba(56,189,248,0.8)',
+              color: '#fff',
+              fontSize: 13
+            }}
+          >
+            <div
+              style={{
+                fontSize: 16,
+                fontWeight: 700,
+                marginBottom: 10
+              }}
+            >
+              Create lobby
+            </div>
 
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ marginBottom: 2 }}>Lobby name</div>
+              <input
+                placeholder='My lucky table'
+                value={lobbyName}
+                onChange={e => setLobbyName(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '5px 8px',
+                  borderRadius: 6,
+                  border: '1px solid #555',
+                  background: '#020617',
+                  color: '#fff',
+                  fontSize: 12
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ marginBottom: 2 }}>Bet amount (TON)</div>
+              <input
+                type='number'
+                step={0.1}
+                placeholder='0.1 eg'
+                value={newLobbyBetInput}
+                onChange={e => setNewLobbyBetInput(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '5px 8px',
+                  borderRadius: 6,
+                  border: '1px solid #555',
+                  background: '#020617',
+                  color: '#fff',
+                  fontSize: 12
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ marginBottom: 2 }}>Lobby size</div>
+              <label style={{ marginRight: 10, fontSize: 12 }}>
+                <input
+                  type='radio'
+                  checked={newLobbySize === 2}
+                  onChange={() => setNewLobbySize(2)}
+                  style={{ marginRight: 4 }}
+                />
+                2 players
+              </label>
+              <label style={{ fontSize: 12 }}>
+                <input
+                  type='radio'
+                  checked={newLobbySize === 4}
+                  onChange={() => setNewLobbySize(4)}
+                  style={{ marginRight: 4 }}
+                />
+                4 players
+              </label>
+            </div>
+
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ marginBottom: 2 }}>Visibility</div>
+              <label style={{ marginRight: 10, fontSize: 12 }}>
+                <input
+                  type='radio'
+                  checked={createMode === 'public'}
+                  onChange={() => setCreateMode('public')}
+                  style={{ marginRight: 4 }}
+                />
+                Public
+              </label>
+              <label style={{ fontSize: 12 }}>
+                <input
+                  type='radio'
+                  checked={createMode === 'private'}
+                  onChange={() => setCreateMode('private')}
+                  style={{ marginRight: 4 }}
+                />
+                Private
+              </label>
+            </div>
+
+            {createMode === 'private' && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ marginBottom: 2 }}>PIN (4 digits)</div>
+                <input
+                  type='password'
+                  value={createPin}
+                  maxLength={4}
+                  onChange={e =>
+                    setCreatePin(e.target.value.replace(/\D/g, ''))
+                  }
+                  style={{
+                    width: '100%',
+                    padding: '5px 8px',
+                    borderRadius: 6,
+                    border: '1px solid #555',
+                    background: '#020617',
+                    color: '#fff',
+                    fontSize: 12
+                  }}
+                />
+              </div>
+            )}
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 8,
+                marginTop: 6
+              }}
+            >
+              <button
+                onClick={() => setIsCreateModalOpen(false)}
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: 999,
+                  border: 'none',
+                  background: 'rgba(148,163,184,0.3)',
+                  color: '#e5e7eb',
+                  fontSize: 12,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={createLobby}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 999,
+                  border: 'none',
+                  background:
+                    'linear-gradient(135deg, #22c55e 0%, #a3e635 100%)',
+                  color: '#022c22',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SEARCH POPUP */}
+      {isSearchModalOpen && (
+        <div
+          onClick={() => setIsSearchModalOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9998
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'linear-gradient(135deg, #020617, #0b1120)',
+              padding: 16,
+              borderRadius: 16,
+              minWidth: 260,
+              maxWidth: 320,
+              border: '1px solid rgba(96,165,250,0.6)',
+              boxShadow: '0 0 24px rgba(56,189,248,0.8)',
+              color: '#fff',
+              fontSize: 13
+            }}
+          >
+            <div
+              style={{
+                fontSize: 16,
+                fontWeight: 700,
+                marginBottom: 10
+              }}
+            >
+              Search lobbies
+            </div>
+
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ marginBottom: 2 }}>
+                Text (lobby name / creator / players)
+              </div>
+              <input
+                placeholder='Type something...'
+                value={searchText}
+                onChange={e => setSearchText(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '5px 8px',
+                  borderRadius: 6,
+                  border: '1px solid #555',
+                  background: '#020617',
+                  color: '#fff',
+                  fontSize: 12
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ marginBottom: 2 }}>Min bet amount (TON)</div>
+              <input
+                type='number'
+                step={0.1}
+                placeholder='0.1'
+                value={searchBetMinInput}
+                onChange={e => setSearchBetMinInput(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '5px 8px',
+                  borderRadius: 6,
+                  border: '1px solid #555',
+                  background: '#020617',
+                  color: '#fff',
+                  fontSize: 12
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ marginBottom: 2 }}>Lobby size</div>
+              <label style={{ marginRight: 10, fontSize: 12 }}>
+                <input
+                  type='radio'
+                  checked={searchSize === 'any'}
+                  onChange={() => setSearchSize('any')}
+                  style={{ marginRight: 4 }}
+                />
+                Any
+              </label>
+              <label style={{ marginRight: 10, fontSize: 12 }}>
+                <input
+                  type='radio'
+                  checked={searchSize === 2}
+                  onChange={() => setSearchSize(2)}
+                  style={{ marginRight: 4 }}
+                />
+                2 players
+              </label>
+              <label style={{ fontSize: 12 }}>
+                <input
+                  type='radio'
+                  checked={searchSize === 4}
+                  onChange={() => setSearchSize(4)}
+                  style={{ marginRight: 4 }}
+                />
+                4 players
+              </label>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 8,
+                marginTop: 6
+              }}
+            >
+              <button
+                onClick={() => {
+                  setSearchText('')
+                  setSearchBetMinInput('')
+                  setSearchSize('any')
+                }}
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: 999,
+                  border: 'none',
+                  background: 'rgba(148,163,184,0.3)',
+                  color: '#e5e7eb',
+                  fontSize: 12,
+                  cursor: 'pointer'
+                }}
+              >
+                Clear
+              </button>
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={() => setIsSearchModalOpen(false)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 999,
+                  border: 'none',
+                  background:
+                    'linear-gradient(135deg, #4bbaff 0%, #5bc9ff 50%, #84d8ff 100%)',
+                  color: '#022c22',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div
         style={{
           position: 'fixed',
