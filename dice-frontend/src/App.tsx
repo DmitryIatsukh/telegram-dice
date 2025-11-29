@@ -1524,38 +1524,34 @@ useEffect(() => {
     )
   }
 
-  // ---- single game / lobby page ----
+   // ---- single game / lobby page ----
   const renderGamePage = () => {
-   const myLobby =
-  myLobbyId != null
-    ? lobbies.find(l => l.id === myLobbyId) || null
-    : null
+    // use the selected lobby that we already computed above
+    const lobbyForGame: Lobby | null = selectedLobby
 
-const lobbyForGame = myLobby || selectedLobby
+    if (!lobbyForGame) {
+      return (
+        <div style={{ padding: 16 }}>
+          <p style={{ fontSize: 14 }}>
+            You are not in any lobby yet. Go to the Lobbies tab and join or
+            create one.
+          </p>
+        </div>
+      )
+    }
 
-if (!lobbyForGame) {
-  return (
-    <div style={{ padding: 16 }}>
-      <p style={{ fontSize: 14 }}>
-        You are not in any lobby yet. Go to the Lobbies tab and join or create
-        one.
-      </p>
-    </div>
-  )
-}
-
-const selectedLobby = lobbyForGame // keep rest of code working
-
-const gameFinished = selectedLobby.status === 'finished'
-
-    const selectedGameResult = selectedLobby.gameResult
+    const gameFinished = lobbyForGame.status === 'finished'
+    const selectedGameResult = lobbyForGame.gameResult
 
     const gameLobbyTitle = (
-      selectedLobby.lobbyName || selectedLobby.name || ''
+      lobbyForGame.lobbyName ||
+      lobbyForGame.name ||
+      ''
     ).trim()
+
     const gameLabel = gameLobbyTitle
       ? `Lobby: ${gameLobbyTitle}`
-      : `Lobby: #${selectedLobby.id}`
+      : `Lobby: #${lobbyForGame.id}`
 
     return (
       <div
@@ -1564,6 +1560,7 @@ const gameFinished = selectedLobby.status === 'finished'
           paddingBottom: 40
         }}
       >
+        {/* Lobby title + id */}
         <div
           style={{
             display: 'flex',
@@ -1575,7 +1572,7 @@ const gameFinished = selectedLobby.status === 'finished'
         >
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
             {gameLabel}{' '}
-            {selectedLobby.isPrivate && (
+            {lobbyForGame.isPrivate && (
               <span
                 style={{
                   fontSize: 11,
@@ -1600,100 +1597,157 @@ const gameFinished = selectedLobby.status === 'finished'
               border: '1px solid rgba(255,255,255,0.25)'
             }}
           >
-            #{selectedLobby.id}
+            #{lobbyForGame.id}
           </span>
         </div>
 
         <p style={{ fontSize: 13, color: '#ccc' }}>
-          Status: {selectedLobby.status}
+          Status: {lobbyForGame.status}
         </p>
         <p style={{ fontSize: 13, color: '#ccc' }}>
-          Creator: {selectedLobby.creatorName || 'not set'}
+          Creator: {lobbyForGame.creatorName || 'not set'}
         </p>
         <p style={{ fontSize: 13, color: '#ccc' }}>
-          Bet: {(selectedLobby.betAmount ?? 1).toFixed(2)} TON
+          Bet: {(lobbyForGame.betAmount ?? 1).toFixed(2)} TON
         </p>
         <p style={{ marginTop: 10, fontSize: 13 }}>
           Players:{' '}
           {[
-            `${selectedLobby.creatorName} (creator)`,
-            ...selectedLobby.players
-              .filter(p => p.id !== selectedLobby.creatorId)
+            `${lobbyForGame.creatorName} (creator)`,
+            ...lobbyForGame.players
+              .filter(p => p.id !== lobbyForGame.creatorId)
               .map(p => p.name)
           ].join(', ')}
         </p>
 
-        {/* Player list with rolling/rolled states */}
-<div
-  style={{
-    marginTop: 12,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 14
-  }}
->
-  {selectedLobby.players.map((p, idx) => {
-    const info = playerRollInfo[p.id]
-    const isRolling =
-      rollingIndex !== null &&
-      selectedLobby.gameResult &&
-      selectedLobby.gameResult.players[rollingIndex].id === p.id
+        {/* The existing row with avatars vs */}
+        {renderLobbyVsRow(lobbyForGame)}
 
-    return (
-      <div
-        key={p.id}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10
-        }}
-      >
-        {/* Avatar */}
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: '50%',
-            overflow: 'hidden',
-            background: 'rgba(255,255,255,0.08)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center'
-          }}
-        >
-          {currentUser?.id === p.id && currentUser.avatarUrl ? (
-            <img
-              src={currentUser.avatarUrl}
-              alt={p.name}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        {/* private lobby PIN input (unchanged) */}
+        {lobbyForGame.isPrivate && (
+          <div style={{ marginTop: 10 }}>
+            <span style={{ fontSize: 14 }}>PIN: </span>
+            <input
+              type="password"
+              value={joinPin}
+              maxLength={4}
+              onChange={e => setJoinPin(e.target.value.replace(/\D/g, ''))}
+              style={{
+                padding: '4px 8px',
+                borderRadius: 6,
+                border: '1px solid #555',
+                background: '#050511',
+                color: '#fff',
+                width: 80
+              }}
             />
-          ) : (
-            <span style={{ fontWeight: 700, fontSize: 16 }}>
-              {p.name.charAt(0).toUpperCase()}
-            </span>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Name + rolling info */}
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontSize: 14, fontWeight: 600 }}>{p.name}</span>
+        {/* join / leave / cancel buttons */}
+        {!gameFinished && (
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 8,
+              marginTop: 12
+            }}
+          >
+            {!isMeCreator && (
+              <button
+                onClick={() =>
+                  isMeInLobby
+                    ? leaveLobby(lobbyForGame.id)
+                    : joinLobby(
+                        lobbyForGame.id,
+                        lobbyForGame.isPrivate ? joinPin : undefined
+                      )
+                }
+                style={{
+                  padding: '8px 16px',
+                  minWidth: 120,
+                  borderRadius: 999,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  background: isMeInLobby
+                    ? 'linear-gradient(135deg, #f97316 0%, #fb7185 50%, #fee2e2 100%)'
+                    : 'linear-gradient(135deg, #00d4ff 0%, #0074ff 60%, #4a00e0 100%)',
+                  color: isMeInLobby ? '#111827' : '#fff',
+                  boxShadow: '0 0 12px rgba(0,0,0,0.4)',
+                  textAlign: 'center'
+                }}
+              >
+                {isMeInLobby ? 'Leave lobby' : 'Join lobby'}
+              </button>
+            )}
 
-          {isRolling && (
-            <span style={{ fontSize: 12, color: '#facc15' }}>
-              rolling…
-            </span>
-          )}
+            {isMeCreator && (
+              <button
+                onClick={() => cancelLobby(lobbyForGame.id)}
+                style={{
+                  padding: '8px 16px',
+                  minWidth: 120,
+                  borderRadius: 999,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  background:
+                    'linear-gradient(135deg, #ff4d6a 0%, #ff0000 40%, #8b0000 100%)',
+                  color: '#fff',
+                  boxShadow: '0 0 12px rgba(0,0,0,0.4)',
+                  textAlign: 'center'
+                }}
+              >
+                Cancel lobby
+              </button>
+            )}
+          </div>
+        )}
 
-          {!isRolling && info?.roll != null && (
-            <span style={{ fontSize: 12, color: '#9ca3af' }}>
-              rolled {info.roll}
-            </span>
-          )}
-        </div>
+        {/* game result block (unchanged logic) */}
+        {selectedGameResult && (
+          <div style={{ marginTop: 14 }}>
+            <h4>Game Result:</h4>
+            <p>
+              Winner: {selectedGameResult.winnerName} (roll{' '}
+              {selectedGameResult.highest})
+            </p>
+
+            <ul>
+              {selectedGameResult.players.map(player => (
+                <li key={player.id}>
+                  {player.name}: rolled {player.roll}
+                </li>
+              ))}
+            </ul>
+
+            {Array.isArray((selectedGameResult as any).rounds) &&
+              (selectedGameResult as any).rounds.length > 1 && (
+                <div style={{ marginTop: 8, fontSize: 12, color: '#ccc' }}>
+                  <div>Rounds (including rerolls):</div>
+                  {(selectedGameResult as any).rounds.map(
+                    (
+                      round: { id: string; name: string; roll: number }[],
+                      idx: number
+                    ) => (
+                      <div key={idx}>
+                        Round {idx + 1}:{' '}
+                        {round.map(r => `${r.name} (${r.roll})`).join(', ')}
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
+          </div>
+        )}
       </div>
     )
-  })}
-</div>
+  }
+
 
 
         {/* phase 1: invisible countdown, show only text */}
