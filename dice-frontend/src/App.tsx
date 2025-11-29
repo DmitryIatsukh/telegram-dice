@@ -35,7 +35,7 @@ type Lobby = {
   betAmount?: number
   maxPlayers?: number
   gameResult: GameResult
-name?: string // NEW: lobby name
+  name?: string // NEW: lobby name
 }
 
 type HistoryItem = {
@@ -360,25 +360,33 @@ function DiceApp() {
       cleaned === '' ? 0 : Number(cleaned.replace(',', '.'))
     const newLobbyBet = isNaN(numeric) ? 0 : numeric
 
-    if (newLobbyBet <= 0) {
-      setErrorMessage('Bet must be greater than 0')
-      return
-    }
+    const cleaned = newLobbyBetInput.trim()
+const numeric = cleaned === '' ? 0 : Number(cleaned.replace(',', '.'))
+const newLobbyBet = isNaN(numeric) ? 0 : numeric
 
-    if (newLobbyBet > availableBalance) {
-      setErrorMessage(
-        "You don't have enough available balance for this bet (some funds may be held in other lobbies)"
-      )
-      return
-    }
+if (newLobbyBet <= 0) {
+  setErrorMessage('Enter bet amount first')
+  return
+}
 
-    if (createMode === 'private' && !/^\d{4}$/.test(createPin)) {
-      setErrorMessage('Private lobby needs a 4-digit PIN')
-      return
-    }
+if (newLobbyBet < 0.1) {
+  setErrorMessage('Minimum bet is 0.1 TON')
+  return
+}
 
-    const betToSend = newLobbyBet >= 0.1 ? newLobbyBet : 0.1
+if (newLobbyBet > availableBalance) {
+  setErrorMessage(
+    "You don't have enough available balance for this bet (some funds may be held in other lobbies)"
+  )
+  return
+}
 
+if (createMode === 'private' && !/^\d{4}$/.test(createPin)) {
+  setErrorMessage('Private lobby needs a 4-digit PIN')
+  return
+}
+
+const betToSend = newLobbyBet
     fetch(`${API}/lobbies/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1735,9 +1743,9 @@ setIsCreateModalOpen(false) // NEW
           }}
         >
           <h3 style={{ marginBottom: 4 }}>
-            {lobby.name
-              ? `${lobby.name} (#{lobby.id})`
-              : `Lobby #${lobby.id}`}{' '}
+           {lobby.name
+  ? `${lobby.name} (#${lobby.id})`
+  : `Lobby #${lobby.id}`}{' '}
             {lobby.isPrivate && (
               <span
                 style={{
