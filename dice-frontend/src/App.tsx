@@ -65,6 +65,12 @@ function App() {
     </TonConnectUIProvider>
   )
 }
+// helper: dice roll is always between 1 and 6 for display
+const normalizeRoll = (roll: number | null | undefined): number => {
+  if (!roll || roll < 1) return 1
+  if (roll > 6) return 6
+  return roll
+}
 
 function DiceApp() {
   const [lobbies, setLobbies] = useState<Lobby[]>([])
@@ -1721,13 +1727,14 @@ useEffect(() => {
               {selectedGameResult.highest})
             </p>
 
-            <ul>
-              {selectedGameResult.players.map(player => (
-                <li key={player.id}>
-                  {player.name}: rolled {player.roll}
-                </li>
-              ))}
-            </ul>
+           <ul>
+  {selectedGameResult.players.map(player => (
+    <li key={player.id}>
+      {player.name}: rolled {normalizeRoll(player.roll)}
+    </li>
+  ))}
+</ul>
+
 
             {Array.isArray((selectedGameResult as any).rounds) &&
               (selectedGameResult as any).rounds.length > 1 && (
@@ -1997,7 +2004,7 @@ useEffect(() => {
                           color: didWin ? '#22c55e' : '#f97316'
                         }}
                       >
-                        You {didWin ? 'won' : 'lost'} with roll {me.roll}
+                        You {didWin ? 'won' : 'lost'} with roll {normalizeRoll(me.roll)}
                       </div>
                     )
                   })()}
