@@ -35,8 +35,8 @@ type Lobby = {
   betAmount?: number
   maxPlayers?: number
   gameResult: GameResult
-  name?: string // NEW: lobby name
-lobbyName?: string
+  name?: string // legacy / backend name
+  lobbyName?: string // new display name
 }
 
 type HistoryItem = {
@@ -443,7 +443,7 @@ function DiceApp() {
           }, 150)
         }
       })
-
+}
   const joinLobby = (id: number, pin?: string) => {
     if (!currentUser) return
 
