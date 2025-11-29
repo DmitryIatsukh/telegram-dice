@@ -214,7 +214,7 @@ router.post('/:id/toggle-ready', (req, res) => {
 // POST /api/lobbies/:id/start  (creator only, all players auto-ready)
 router.post('/:id/start', (req, res) => {
   const id = Number(req.params.id);
-  const { userId } = req.body;
+  const { userId } = req.body || {};
 
   const lobby = lobbies.find(l => l.id === id);
   if (!lobby) {
@@ -222,18 +222,20 @@ router.post('/:id/start', (req, res) => {
   }
 
   if (String(userId) !== String(lobby.creatorId)) {
-    return res.status(403).json({ error: 'Only lobby creator can start game' });
+    return res
+      .status(403)
+      .json({ error: 'Only lobby creator can start game' });
   }
 
   // Everyone in the game: creator + all joined players
   const readyPlayers = [
     {
-      id: lobby.creatorId,
+      id: String(lobby.creatorId),
       name: lobby.creatorName,
     },
     ...lobby.players
       .filter(p => String(p.id) !== String(lobby.creatorId))
-      .map(p => ({ id: p.id, name: p.name })),
+      .map(p => ({ id: String(p.id), name: p.name })),
   ];
 
   // Need at least 2 players
@@ -250,21 +252,26 @@ router.post('/:id/start', (req, res) => {
 
   // Contenders in current round: all ready players
   let contenders = readyPlayers.map(p => ({
-    id: p.id,
+    id: String(p.id),
     name: p.name,
   }));
 
   let finalWinner = null;
   let finalHighest = 0;
-  const finalRollsById = {}; // id -> roll in the deciding round
+
+  // each player's last roll in the **last round they played**
+  const finalRollsById = {}; // { [id]: number }
 
   while (true) {
     // Roll for each contender in this round
     contenders.forEach(p => {
-      p.roll = rollDice();
+      const r = rollDice(); // 1..6
+      p.roll = r;
+      // remember this as the latest roll for this player
+      finalRollsById[p.id] = r;
     });
 
-    // Save this round for UI (id, name, roll)
+    // Save this round for UI
     rounds.push(
       contenders.map(p => ({
         id: p.id,
@@ -273,62 +280,42 @@ router.post('/:id/start', (req, res) => {
       })),
     );
 
-    const highest = Math.max(...gameResult.players.map(p => p.roll))
-    const winners = gameResult.players.filter(p => p.roll === highest)
+    // Find highest roll **among contenders in this round**
+    const highest = Math.max(...contenders.map(p => p.roll));
+    const highestPlayers = contenders.filter(p => p.roll === highest);
 
     if (highestPlayers.length === 1) {
-      // Unique winner found
+      // unique winner found
       finalWinner = highestPlayers[0];
       finalHighest = highest;
-      highestPlayers.forEach(p => {
-        finalRollsById[p.id] = p.roll;
-      });
       break;
     }
 
-    // Tie – next round with only the tied players
+    // tie -> next round only with tied players (without .roll)
     contenders = highestPlayers.map(p => ({
       id: p.id,
       name: p.name,
     }));
   }
 
-  // Payout: winner gets all others' bets (we assume individual bet = lobby.betAmount)
+  // Payout:
+  // pot = bet * number of players
+  // rake = 5% of pot
+  // winner net profit = pot - rake - own bet
   const n = readyPlayers.length;
-  const winnerProfit = bet * (n - 1);
+  const pot = bet * n;
+  const rake = pot * 0.05;
+  const winnerNetProfit = pot - rake - bet;
 
   readyPlayers.forEach(p => {
     if (String(p.id) === String(finalWinner.id)) {
-      recordBetResult(p.id, p.name, winnerProfit, 'win');
+      // winner gets net PROFIT (extra over his own bet)
+      recordBetResult(p.id, p.name, winnerNetProfit, 'win');
     } else {
       // losers lose their bet
       recordBetResult(p.id, p.name, bet, 'lose');
     }
   });
-// example: after all rolls are done
-gameResult.players = gameResult.players.map(p => {
-  let roll = Number(p.roll)
-
-  if (!roll || roll < 1 || roll > 6) {
-    // fallback safety – reroll on the server if something was wrong
-    roll = rollDice()
-  }
-
-  return { ...p, roll }
-})
-
-// same idea for rounds history if you store it
-if (Array.isArray(gameResult.rounds)) {
-  gameResult.rounds = gameResult.rounds.map(round =>
-    round.map(r => {
-      let roll = Number(r.roll)
-      if (!roll || roll < 1 || roll > 6) {
-        roll = rollDice()
-      }
-      return { ...r, roll }
-    })
-  )
-}
 
   // Update lobby
   lobby.status = 'finished';
@@ -339,10 +326,8 @@ if (Array.isArray(gameResult.rounds)) {
     players: readyPlayers.map(p => ({
       id: p.id,
       name: p.name,
-      roll:
-        finalRollsById[String(p.id)] !== undefined
-          ? finalRollsById[String(p.id)]
-          : 0,
+      // use the last roll we have for that player; fallback to 1 (never 0)
+      roll: finalRollsById[String(p.id)] ?? 1,
     })),
     rounds,
   };
