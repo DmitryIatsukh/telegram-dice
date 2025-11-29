@@ -83,7 +83,6 @@ function DiceApp() {
   const [newLobbySize, setNewLobbySize] = useState<2 | 4>(4)
   const [createPin, setCreatePin] = useState('')
   const [joinPin, setJoinPin] = useState('')
-  const [rollRevealIndex, setRollRevealIndex] = useState<number | null>(null)
   // phase 1: invisible 10s pre-start (show "Starting..." text only)
 const [preStartLobbyId, setPreStartLobbyId] = useState<number | null>(null)
 const [preStartSeconds, setPreStartSeconds] = useState<number>(0)
@@ -92,8 +91,8 @@ const [preStartSeconds, setPreStartSeconds] = useState<number>(0)
 const [visibleCountdown, setVisibleCountdown] = useState<number | null>(null)
 
 // rolling sequence state
-const [rollingIndex, setRollingIndex] = useState<number | null>(null)
-const [playerRollInfo, setPlayerRollInfo] = useState<
+const [, setRollingIndex] = useState<number | null>(null)
+const [, setPlayerRollInfo] = useState<
   Record<string, { roll: number | null; round: number }>
 >({})
 
@@ -790,33 +789,6 @@ useEffect(() => {
   return () => clearInterval(interval)
 }, [visibleCountdown, myLobbyId, lobbies])
 
-
-  // reveal rolls one by one
-  useEffect(() => {
-    if (!selectedLobby || !selectedLobby.gameResult) {
-      setRollRevealIndex(null)
-      return
-    }
-
-    const players = selectedLobby.gameResult.players || []
-    if (players.length === 0) {
-      setRollRevealIndex(null)
-      return
-    }
-
-    setRollRevealIndex(0)
-    let i = 0
-    const interval = setInterval(() => {
-      i += 1
-      if (i >= players.length) {
-        clearInterval(interval)
-      } else {
-        setRollRevealIndex(i)
-      }
-    }, 800)
-
-    return () => clearInterval(interval)
-  }, [selectedLobby?.id, selectedLobby?.gameResult])
 
   // TonConnect: deposit / withdraw
   const handleDeposit = async () => {
