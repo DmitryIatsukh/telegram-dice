@@ -506,8 +506,6 @@ useEffect(() => {
 }
 
 
-  const userBet = userBets[id] ?? 0
-
   // minimum bet: lobby base bet (if exists) OR 0.1
   const minBet =
     lobby.betAmount != null && lobby.betAmount > 0 ? lobby.betAmount : 0.1
