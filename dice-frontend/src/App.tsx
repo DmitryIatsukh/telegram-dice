@@ -505,14 +505,6 @@ useEffect(() => {
     })
 }
 
-  const toggleReady = (id: number): Promise<Lobby | null> => {
-  if (!currentUser) return Promise.resolve(null)
-
-  const lobby = lobbies.find(l => l.id === id)
-  if (!lobby) {
-    setErrorMessage('Lobby not found')
-    return Promise.resolve(null)
-  }
 
   const userBet = userBets[id] ?? 0
 
