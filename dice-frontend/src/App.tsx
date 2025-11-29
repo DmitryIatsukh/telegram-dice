@@ -1410,14 +1410,14 @@ const [localLobbyNames, setLocalLobbyNames] = useState<Record<number, string>>(
     )
   }
 
-    // ---- single game / lobby page ----
+     // ---- single game / lobby page ----
   const renderGamePage = () => {
     if (!selectedLobby) {
       return (
         <div style={{ padding: 16 }}>
           <p style={{ fontSize: 14 }}>
-            You are not in any lobby yet. Go to the Lobbies tab and join or
-            create one.
+            You are not in any lobby yet. Go to the Lobbies tab and join or create
+            one.
           </p>
         </div>
       )
@@ -1426,12 +1426,7 @@ const [localLobbyNames, setLocalLobbyNames] = useState<Record<number, string>>(
     const gameFinished = selectedLobby.status === 'finished'
     const selectedGameResult = selectedLobby.gameResult
 
-    const gameLobbyTitle = (
-      selectedLobby.lobbyName ||
-      selectedLobby.name ||
-      ''
-    ).trim()
-
+    const gameLobbyTitle = (selectedLobby.lobbyName || selectedLobby.name || '').trim()
     const gameLabel = gameLobbyTitle
       ? `Lobby: ${gameLobbyTitle}`
       : `Lobby: #${selectedLobby.id}`
@@ -1443,7 +1438,7 @@ const [localLobbyNames, setLocalLobbyNames] = useState<Record<number, string>>(
           paddingBottom: 40
         }}
       >
-        {/* title + id */}
+        {/* Lobby title + id */}
         <div
           style={{
             display: 'flex',
@@ -1640,8 +1635,6 @@ const [localLobbyNames, setLocalLobbyNames] = useState<Record<number, string>>(
       </div>
     )
   }
-  }
-
     // ---- FILTERS for lobbies (search) ----
 
   const isSearchEmpty =
@@ -1790,6 +1783,26 @@ const [localLobbyNames, setLocalLobbyNames] = useState<Record<number, string>>(
 
             {visibleLobbies.length === 0 && <p>No lobbies match your search</p>}
 
+        const renderLobbiesPage = () => (
+    <>
+      {/* HEADER with Create / Search + count */}
+      <div
+        style={{
+          margin: '10px 0 14px',
+          padding: 10,
+          background: 'rgba(0,20,60,0.85)',
+          borderRadius: 12,
+          border: '1px solid rgba(0,120,255,0.2)',
+          boxShadow: '0 0 18px rgba(0,80,255,0.25)'
+        }}
+      >
+        {/* ... header buttons & count stay as you have them ... */}
+      </div>
+
+      <h2 style={{ marginTop: 4, marginBottom: 8 }}>Lobbies:</h2>
+
+      {visibleLobbies.length === 0 && <p>No lobbies match your search</p>}
+
       {visibleLobbies.map(lobby => {
         const title = (lobby.lobbyName || lobby.name || '').trim()
         const label = title ? `Lobby: ${title}` : `Lobby: #${lobby.id}`
@@ -1807,6 +1820,7 @@ const [localLobbyNames, setLocalLobbyNames] = useState<Record<number, string>>(
               boxShadow: '0 0 14px rgba(0,80,255,0.4)'
             }}
           >
+            {/* title row */}
             <div
               style={{
                 display: 'flex',
@@ -1856,9 +1870,7 @@ const [localLobbyNames, setLocalLobbyNames] = useState<Record<number, string>>(
               </span>
             </div>
 
-            <p style={{ fontSize: 13, color: '#ccc' }}>
-              Status: {lobby.status}
-            </p>
+            <p style={{ fontSize: 13, color: '#ccc' }}>Status: {lobby.status}</p>
             <p style={{ fontSize: 13, color: '#ccc' }}>
               Creator: {lobby.creatorName || 'not set yet (no players)'}
             </p>
@@ -1928,7 +1940,8 @@ const [localLobbyNames, setLocalLobbyNames] = useState<Record<number, string>>(
           </div>
         )
       })}
-
+    </>
+  )
   // ---- banner info: GLOBAL wins from all finished lobbies ----
   const finishedLobbies = lobbies.filter(
     l =>
