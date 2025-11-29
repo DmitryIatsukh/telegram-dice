@@ -1410,14 +1410,14 @@ const [localLobbyNames, setLocalLobbyNames] = useState<Record<number, string>>(
     )
   }
 
-  // ---- single game / lobby page ----
+    // ---- single game / lobby page ----
   const renderGamePage = () => {
     if (!selectedLobby) {
       return (
         <div style={{ padding: 16 }}>
           <p style={{ fontSize: 14 }}>
-            You are not in any lobby yet. Go to the Lobbies tab and join or create
-            one.
+            You are not in any lobby yet. Go to the Lobbies tab and join or
+            create one.
           </p>
         </div>
       )
@@ -1426,6 +1426,16 @@ const [localLobbyNames, setLocalLobbyNames] = useState<Record<number, string>>(
     const gameFinished = selectedLobby.status === 'finished'
     const selectedGameResult = selectedLobby.gameResult
 
+    const gameLobbyTitle = (
+      selectedLobby.lobbyName ||
+      selectedLobby.name ||
+      ''
+    ).trim()
+
+    const gameLabel = gameLobbyTitle
+      ? `Lobby: ${gameLobbyTitle}`
+      : `Lobby: #${selectedLobby.id}`
+
     return (
       <div
         style={{
@@ -1433,53 +1443,47 @@ const [localLobbyNames, setLocalLobbyNames] = useState<Record<number, string>>(
           paddingBottom: 40
         }}
       >
-                const gameLobbyTitle =
-  (selectedLobby.lobbyName || selectedLobby.name || '').trim()
-const gameLabel = gameLobbyTitle
-  ? `Lobby: ${gameLobbyTitle}`
-  : `Lobby: #${selectedLobby.id}`
-
-return (
-  <div
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      marginBottom: 8,
-      justifyContent: 'space-between',
-      gap: 8
-    }}
-  >
-    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
-      {gameLabel}{' '}
-      {selectedLobby.isPrivate && (
-        <span
+        {/* title + id */}
+        <div
           style={{
-            fontSize: 11,
-            background:
-              'linear-gradient(135deg, #ff4d6a 0%, #ff9a9e 100%)',
-            padding: '2px 8px',
-            borderRadius: 999,
-            marginLeft: 6,
-            color: '#111'
+            display: 'flex',
+            alignItems: 'center',
+            marginBottom: 8,
+            justifyContent: 'space-between',
+            gap: 8
           }}
         >
-          Private
-        </span>
-      )}
-    </h3>
-    <span
-      style={{
-        fontSize: 11,
-        opacity: 0.9,
-        padding: '2px 6px',
-        borderRadius: 999,
-        border: '1px solid rgba(255,255,255,0.25)'
-      }}
-    >
-      #{selectedLobby.id}
-    </span>
-  </div>
-)
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
+            {gameLabel}{' '}
+            {selectedLobby.isPrivate && (
+              <span
+                style={{
+                  fontSize: 11,
+                  background:
+                    'linear-gradient(135deg, #ff4d6a 0%, #ff9a9e 100%)',
+                  padding: '2px 8px',
+                  borderRadius: 999,
+                  marginLeft: 6,
+                  color: '#111'
+                }}
+              >
+                Private
+              </span>
+            )}
+          </h3>
+          <span
+            style={{
+              fontSize: 11,
+              opacity: 0.9,
+              padding: '2px 6px',
+              borderRadius: 999,
+              border: '1px solid rgba(255,255,255,0.25)'
+            }}
+          >
+            #{selectedLobby.id}
+          </span>
+        </div>
+
         <p style={{ fontSize: 13, color: '#ccc' }}>
           Status: {selectedLobby.status}
         </p>
@@ -1636,6 +1640,7 @@ return (
       </div>
     )
   }
+  }
 
     // ---- FILTERS for lobbies (search) ----
 
@@ -1644,34 +1649,32 @@ return (
     !searchBetMinInput.trim() &&
     searchSize === 'any'
 
-  const matchesFilters = (lobby: Lobby) => {
-    // TEXT filter (lobby name, creator, players)
+    const matchesFilters = (lobby: Lobby) => {
+    // TEXT filter (lobby name / creator / players / id)
     const q = searchText.trim().toLowerCase()
-if (q) {
-  const displayName = (lobby.lobbyName || lobby.name || '').toLowerCase()
-  const creatorMatch = (lobby.creatorName || '').toLowerCase().includes(q)
-  const playersMatch = lobby.players.some(p =>
-    p.name.toLowerCase().includes(q)
-  )
-  const idMatch = lobby.id.toString().includes(q)
+    if (q) {
+      const displayName = (lobby.lobbyName || lobby.name || '').toLowerCase()
+      const creatorMatch = (lobby.creatorName || '')
+        .toLowerCase()
+        .includes(q)
+      const playersMatch = lobby.players.some(p =>
+        p.name.toLowerCase().includes(q)
+      )
+      const idMatch = lobby.id.toString().includes(q)
 
-  if (
-    !displayName.includes(q) &&
-    !creatorMatch &&
-    !playersMatch &&
-    !idMatch
-  ) {
-    return false
-  }
-}
-    // BET filter (min bet)
+      if (!displayName.includes(q) && !creatorMatch && !playersMatch && !idMatch) {
+        return false
+      }
+    }
+
+    // BET filter (max bet)
     if (searchBetMinInput.trim()) {
-  const maxBet = Number(searchBetMinInput.replace(',', '.'))
-  if (!isNaN(maxBet) && maxBet > 0) {
-    const bet = lobby.betAmount ?? 0
-    if (bet > maxBet) return false
-  }
-}
+      const maxBet = Number(searchBetMinInput.replace(',', '.'))
+      if (!isNaN(maxBet) && maxBet > 0) {
+        const bet = lobby.betAmount ?? 0
+        if (bet > maxBet) return false
+      }
+    }
 
     // SIZE filter
     if (searchSize !== 'any') {
@@ -1785,148 +1788,146 @@ if (q) {
 
       <h2 style={{ marginTop: 4, marginBottom: 8 }}>Lobbies:</h2>
 
-      {visibleLobbies.length === 0 && <p>No lobbies match your search</p>}
+            {visibleLobbies.length === 0 && <p>No lobbies match your search</p>}
 
-      {visibleLobbies.map(lobby => (
-        <div
-          key={lobby.id}
-          style={{
-            padding: 12,
-            marginBottom: 10,
-            background:
-              'linear-gradient(135deg, rgba(0,30,80,0.9), rgba(0,15,40,0.95))',
-            borderRadius: 10,
-            border: '1px solid rgba(0,120,255,0.25)',
-            boxShadow: '0 0 14px rgba(0,80,255,0.4)'
-          }}
-        >
-                    const title = (lobby.lobbyName || lobby.name || '').trim()
-const label = title ? `Lobby: ${title}` : `Lobby: #${lobby.id}`
+      {visibleLobbies.map(lobby => {
+        const title = (lobby.lobbyName || lobby.name || '').trim()
+        const label = title ? `Lobby: ${title}` : `Lobby: #${lobby.id}`
 
-<div
-  key={lobby.id}
-  style={{ ... }}
->
-  <div
-    style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 4,
-      gap: 8
-    }}
-  >
-    <div>
-      <h3
-        style={{
-          margin: 0,
-          fontSize: 15,
-          fontWeight: 700
-        }}
-      >
-        {label}{' '}
-        {lobby.isPrivate && (
-          <span
+        return (
+          <div
+            key={lobby.id}
             style={{
-              fontSize: 11,
+              padding: 12,
+              marginBottom: 10,
               background:
-                'linear-gradient(135deg, #ff4d6a 0%, #ff9a9e 100%)',
-              padding: '2px 8px',
-              borderRadius: 999,
-              marginLeft: 6,
-              color: '#111',
-              fontWeight: 600
+                'linear-gradient(135deg, rgba(0,30,80,0.9), rgba(0,15,40,0.95))',
+              borderRadius: 10,
+              border: '1px solid rgba(0,120,255,0.25)',
+              boxShadow: '0 0 14px rgba(0,80,255,0.4)'
             }}
           >
-            Private
-          </span>
-        )}
-      </h3>
-    </div>
-    <span
-      style={{
-        fontSize: 11,
-        opacity: 0.9,
-        padding: '2px 6px',
-        borderRadius: 999,
-        border: '1px solid rgba(255,255,255,0.25)'
-      }}
-    >
-      #{lobby.id}
-    </span>
-  </div>
-  {/* rest of card (Status, Creator, Players, Bet, etc.) */}
-          <p style={{ fontSize: 13, color: '#ccc' }}>Status: {lobby.status}</p>
-          <p style={{ fontSize: 13, color: '#ccc' }}>
-            Creator: {lobby.creatorName || 'not set yet (no players)'}
-          </p>
-          <p style={{ fontSize: 13, color: '#ccc' }}>
-            Players: {lobby.players.length}
-            {lobby.maxPlayers ? ` / ${lobby.maxPlayers}` : ''}
-          </p>
-          <p style={{ fontSize: 13, color: '#ccc' }}>
-            Bet: {(lobby.betAmount ?? 1).toFixed(2)} TON
-          </p>
-
-          {renderLobbyVsRow(lobby)}
-
-          {lobby.status === 'finished' && lobby.gameResult && (
-            <div style={{ marginTop: 6, fontSize: 12 }}>
-              <div style={{ color: '#bbf7d0' }}>
-                Winner:{' '}
-                <span style={{ fontWeight: 700 }}>
-                  {lobby.gameResult.winnerName}
-                </span>{' '}
-                (roll {lobby.gameResult.highest})
-              </div>
-
-              {currentUser &&
-                (() => {
-                  const me = lobby.gameResult!.players.find(
-                    p => p.id === currentUser.id
-                  )
-                  if (!me) return null
-                  const didWin =
-                    lobby.gameResult!.winnerId === currentUser.id
-                  return (
-                    <div
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 4,
+                gap: 8
+              }}
+            >
+              <div>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 15,
+                    fontWeight: 700
+                  }}
+                >
+                  {label}{' '}
+                  {lobby.isPrivate && (
+                    <span
                       style={{
-                        marginTop: 2,
-                        color: didWin ? '#22c55e' : '#f97316'
+                        fontSize: 11,
+                        background:
+                          'linear-gradient(135deg, #ff4d6a 0%, #ff9a9e 100%)',
+                        padding: '2px 8px',
+                        borderRadius: 999,
+                        marginLeft: 6,
+                        color: '#111',
+                        fontWeight: 600
                       }}
                     >
-                      You {didWin ? 'won' : 'lost'} with roll {me.roll}
-                    </div>
-                  )
-                })()}
+                      Private
+                    </span>
+                  )}
+                </h3>
+              </div>
+              <span
+                style={{
+                  fontSize: 11,
+                  opacity: 0.9,
+                  padding: '2px 6px',
+                  borderRadius: 999,
+                  border: '1px solid rgba(255,255,255,0.25)'
+                }}
+              >
+                #{lobby.id}
+              </span>
             </div>
-          )}
 
-          <button
-            onClick={() => {
-              setSelectedLobbyId(lobby.id)
-              setCurrentPage('game')
-            }}
-            style={{
-              padding: '7px 16px',
-              background:
-                'linear-gradient(135deg, #00d4ff 0%, #0074ff 60%, #4a00e0 100%)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 999,
-              cursor: 'pointer',
-              marginTop: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              boxShadow: '0 0 12px rgba(0,116,255,0.8)'
-            }}
-          >
-            {lobby.status === 'finished' ? 'View result' : 'Open Lobby'}
-          </button>
-        </div>
-      ))}
-    </>
-  )
+            <p style={{ fontSize: 13, color: '#ccc' }}>
+              Status: {lobby.status}
+            </p>
+            <p style={{ fontSize: 13, color: '#ccc' }}>
+              Creator: {lobby.creatorName || 'not set yet (no players)'}
+            </p>
+            <p style={{ fontSize: 13, color: '#ccc' }}>
+              Players: {lobby.players.length}
+              {lobby.maxPlayers ? ` / ${lobby.maxPlayers}` : ''}
+            </p>
+            <p style={{ fontSize: 13, color: '#ccc' }}>
+              Bet: {(lobby.betAmount ?? 1).toFixed(2)} TON
+            </p>
+
+            {renderLobbyVsRow(lobby)}
+
+            {lobby.status === 'finished' && lobby.gameResult && (
+              <div style={{ marginTop: 6, fontSize: 12 }}>
+                <div style={{ color: '#bbf7d0' }}>
+                  Winner:{' '}
+                  <span style={{ fontWeight: 700 }}>
+                    {lobby.gameResult.winnerName}
+                  </span>{' '}
+                  (roll {lobby.gameResult.highest})
+                </div>
+
+                {currentUser &&
+                  (() => {
+                    const me = lobby.gameResult!.players.find(
+                      p => p.id === currentUser.id
+                    )
+                    if (!me) return null
+                    const didWin =
+                      lobby.gameResult!.winnerId === currentUser.id
+                    return (
+                      <div
+                        style={{
+                          marginTop: 2,
+                          color: didWin ? '#22c55e' : '#f97316'
+                        }}
+                      >
+                        You {didWin ? 'won' : 'lost'} with roll {me.roll}
+                      </div>
+                    )
+                  })()}
+              </div>
+            )}
+
+            <button
+              onClick={() => {
+                setSelectedLobbyId(lobby.id)
+                setCurrentPage('game')
+              }}
+              style={{
+                padding: '7px 16px',
+                background:
+                  'linear-gradient(135deg, #00d4ff 0%, #0074ff 60%, #4a00e0 100%)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 999,
+                cursor: 'pointer',
+                marginTop: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                boxShadow: '0 0 12px rgba(0,116,255,0.8)'
+              }}
+            >
+              {lobby.status === 'finished' ? 'View result' : 'Open Lobby'}
+            </button>
+          </div>
+        )
+      })}
 
   // ---- banner info: GLOBAL wins from all finished lobbies ----
   const finishedLobbies = lobbies.filter(
@@ -2418,14 +2419,14 @@ const label = title ? `Lobby: ${title}` : `Lobby: #${lobby.id}`
     zIndex: 20
   }}
 >
-  <div
+    <div
     style={{
       width: '100%',   // full width = no side gap
       maxWidth: 480,
       display: 'flex',
       gap: 8,
       padding: 4,
-      borderRadius: 0 0 0 0 // or keep a small radius if you like
+      borderRadius: 0 // remove weird "0 0 0 0" + inline comment
     }}
   >
           <button
