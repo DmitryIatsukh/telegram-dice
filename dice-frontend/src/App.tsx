@@ -1273,7 +1273,106 @@ const [searchName, setSearchName] = useState('');
       </div>
     )
   }
+  // ---- small helper: show "creator VS other players" row ----
+  const renderLobbyVsRow = (lobby: Lobby | null) => {
+    if (!lobby) return null;
 
+    const creatorName = lobby.creatorName || 'Creator';
+    const others = lobby.players.filter(p => p.id !== lobby.creatorId);
+
+    // how many slots to show on the "other side"
+    const slotsCount = lobby.maxPlayers ?? Math.max(2, 1 + others.length);
+    const slots = Array.from({ length: slotsCount });
+
+    return (
+      <div style={{ marginTop: 16 }}>
+        <div
+          style={{
+            fontSize: 13,
+            marginBottom: 6,
+            color: '#e5e7eb',
+          }}
+        >
+          Table view:
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            gap: 16,
+            flexWrap: 'wrap',
+          }}
+        >
+          {/* CREATOR COLUMN */}
+          <div style={{ minWidth: 90, textAlign: 'center' }}>
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: '50%',
+                margin: '0 auto 6px',
+                background:
+                  'linear-gradient(135deg, #60a5fa 0%, #6366f1 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: 24,
+              }}
+            >
+              {creatorName.charAt(0).toUpperCase()}
+            </div>
+            <div style={{ fontSize: 13 }}>{creatorName}</div>
+            <div style={{ fontSize: 11, opacity: 0.7 }}>(creator)</div>
+          </div>
+
+          {/* VS LABEL */}
+          <div
+            style={{
+              alignSelf: 'center',
+              fontWeight: 700,
+              fontSize: 16,
+            }}
+          >
+            VS
+          </div>
+
+          {/* OTHER PLAYERS */}
+          <div
+            style={{
+              display: 'flex',
+              gap: 12,
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+            }}
+          >
+            {slots.map((_, i) => {
+              const player = others[i];
+              const isEmpty = !player;
+              const label = isEmpty ? 'Waiting…' : player.name;
+              const initial = isEmpty
+                ? '?'
+                : player.name.charAt(0).toUpperCase();
+
+              return (
+                <div
+                  key={i}
+                  style={{
+                    minWidth: 75,
+                    textAlign: 'center',
+                    opacity: isEmpty ? 0.5 : 1,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: '50%',
+                      margin: '0 auto 4px',
+                      border: '2px dashed rgba(148,163,184,0.7)',
+                      display: 'flex',
+                     
   // ---- single game / lobby page ----
 
   const renderGamePage = () => {
