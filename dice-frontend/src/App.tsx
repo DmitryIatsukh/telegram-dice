@@ -36,6 +36,7 @@ type Lobby = {
   maxPlayers?: number
   gameResult: GameResult
   name?: string // NEW: lobby name
+lobbyName?: string
 }
 
 type HistoryItem = {
@@ -143,7 +144,16 @@ function DiceApp() {
     body.style.background =
       'radial-gradient(circle at top, #0044cc 0%, #001b4d 40%, #000814 100%)'
   }, [])
-
+  useEffect(() => {
+    const meta =
+      document.querySelector<HTMLMetaElement>('meta[name="viewport"]')
+    if (meta) {
+      meta.setAttribute(
+        'content',
+        'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no'
+      )
+    }
+  }, [])
   // ---- backend: lobbies ----
   const loadLobbies = () => {
     fetch(`${API}/lobbies`)
@@ -409,25 +419,30 @@ function DiceApp() {
       }
       return res.json()
     })
-    .then((lobby: Lobby | null) => {
-      if (!lobby) return
+          .then((lobby: Lobby | null) => {
+        if (!lobby) return
 
-      setLobbies(prev => [...prev, lobby])
-      setSelectedLobbyId(lobby.id)
-      setCreatePin('')
-      setCurrentPage('game')
-      setIsCreateModalOpen(false)
+        const lobbyWithName: Lobby = {
+          ...lobby,
+          lobbyName: lobbyName || lobby.lobbyName || lobby.name
+        }
 
-      if (currentUser) {
-        setTimeout(() => {
-          joinLobby(
-            lobby.id,
-            createMode === 'private' ? createPin : undefined
-          )
-        }, 150)
-      }
-    })
-}
+        setLobbies(prev => [...prev, lobbyWithName])
+        setSelectedLobbyId(lobbyWithName.id)
+        setCreatePin('')
+        setLobbyName('')
+        setCurrentPage('game')
+        setIsCreateModalOpen(false)
+
+        if (currentUser) {
+          setTimeout(() => {
+            joinLobby(
+              lobbyWithName.id,
+              createMode === 'private' ? createPin : undefined
+            )
+          }, 150)
+        }
+      })
 
   const joinLobby = (id: number, pin?: string) => {
     if (!currentUser) return
@@ -1399,7 +1414,7 @@ function DiceApp() {
           paddingBottom: 40
         }}
       >
-        <div
+                <div
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -1407,7 +1422,11 @@ function DiceApp() {
           }}
         >
           <h3>
-            Lobby #{selectedLobby.id}{' '}
+            {selectedLobby.lobbyName || selectedLobby.name
+              ? `Lobby #${selectedLobby.id} · ${
+                  selectedLobby.lobbyName || selectedLobby.name
+                }`
+              : `Lobby #${selectedLobby.id}`}{' '}
             {selectedLobby.isPrivate && (
               <span
                 style={{
@@ -1594,16 +1613,20 @@ function DiceApp() {
     // TEXT filter (lobby name, creator, players)
     const q = searchText.trim().toLowerCase()
     if (q) {
-      const nameMatch = (lobby.name || '').toLowerCase().includes(q)
-      const creatorMatch = (lobby.creatorName || '')
-        .toLowerCase()
-        .includes(q)
+      const displayName = (lobby.lobbyName || lobby.name || '').toLowerCase()
+      const creatorMatch = (lobby.creatorName || '').toLowerCase().includes(q)
       const playersMatch = lobby.players.some(p =>
         p.name.toLowerCase().includes(q)
       )
-      if (!nameMatch && !creatorMatch && !playersMatch) return false
-    }
 
+      if (
+        !displayName.includes(q) &&
+        !creatorMatch &&
+        !playersMatch
+      ) {
+        return false
+      }
+    }
     // BET filter (min bet)
     if (searchBetMinInput.trim()) {
       const minBet = Number(searchBetMinInput.replace(',', '.'))
@@ -1740,10 +1763,10 @@ function DiceApp() {
             boxShadow: '0 0 14px rgba(0,80,255,0.4)'
           }}
         >
-          <h3 style={{ marginBottom: 4 }}>
-           {lobby.name
-  ? `${lobby.name} (#${lobby.id})`
-  : `Lobby #${lobby.id}`}{' '}
+                    <h3 style={{ marginBottom: 4 }}>
+            {lobby.lobbyName || lobby.name
+              ? `${lobby.lobbyName || lobby.name} (#${lobby.id})`
+              : `Lobby #${lobby.id}`}{' '}
             {lobby.isPrivate && (
               <span
                 style={{
@@ -1971,14 +1994,16 @@ function DiceApp() {
             zIndex: 9998
           }}
         >
-          <div
+                    <div
             onClick={e => e.stopPropagation()}
             style={{
               background: 'linear-gradient(135deg, #020617, #0b1120)',
               padding: 16,
               borderRadius: 16,
-              minWidth: 260,
-              maxWidth: 320,
+              width: '90%',
+              maxWidth: 360,
+              boxSizing: 'border-box',
+              margin: '0 16px',
               border: '1px solid rgba(96,165,250,0.6)',
               boxShadow: '0 0 24px rgba(56,189,248,0.8)',
               color: '#fff',
@@ -2157,14 +2182,16 @@ function DiceApp() {
             zIndex: 9998
           }}
         >
-          <div
+                    <div
             onClick={e => e.stopPropagation()}
             style={{
               background: 'linear-gradient(135deg, #020617, #0b1120)',
               padding: 16,
               borderRadius: 16,
-              minWidth: 260,
-              maxWidth: 320,
+              width: '90%',
+              maxWidth: 360,
+              boxSizing: 'border-box',
+              margin: '0 16px',
               border: '1px solid rgba(96,165,250,0.6)',
               boxShadow: '0 0 24px rgba(56,189,248,0.8)',
               color: '#fff',
@@ -2299,13 +2326,13 @@ function DiceApp() {
           </div>
         </div>
       )}
-      <div
+            <div
         style={{
           position: 'fixed',
           left: 0,
           right: 0,
-          bottom: 0,
-          padding: '2px 0 calc(env(safe-area-inset-bottom, 0px) + 4px)',
+          bottom: 10, // lifted a bit above the swipe bar
+          padding: '4px 0 calc(env(safe-area-inset-bottom, 0px) + 10px)',
           background:
             'linear-gradient(135deg, rgba(0,40,100,0.96), rgba(0,15,60,0.96))',
           borderTop: '1px solid rgba(0,140,255,0.35)',
