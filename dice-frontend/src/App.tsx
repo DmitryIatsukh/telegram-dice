@@ -81,6 +81,9 @@ function DiceApp() {
 const [newLobbySize, setNewLobbySize] = useState<2 | 4>(4);
   const [createPin, setCreatePin] = useState('')
   const [joinPin, setJoinPin] = useState('')
+const [rollRevealIndex, setRollRevealIndex] = useState<number | null>(null);
+const [countdown, setCountdown] = useState<number | null>(null);
+const [autoStartLobbyId, setAutoStartLobbyId] = useState<number | null>(null);
 // --- bet amount when creating a new lobby ---
 
 const [newLobbyBet, setNewLobbyBet] = useState<number>(1)
@@ -631,14 +634,87 @@ const cancelLobby = (id: number) => {
       : null
   
   const meInSelectedLobby =
-    currentUser && selectedLobby
-      ? selectedLobby.players.find(p => p.id === currentUser.id)
-      : undefined;
-  const isMeReady = !!meInSelectedLobby?.isReady;
-const isMeInLobby = !!meInSelectedLobby
+  currentUser && selectedLobby
+    ? selectedLobby.players.find(p => p.id === currentUser.id)
+    : undefined;
+
+const isMeInLobby = !!meInSelectedLobby;
   const isMeCreator =
     !!currentUser && !!selectedLobby && currentUser.id === selectedLobby.creatorId
+// --- Auto-start countdown when lobby is full ---
+useEffect(() => {
+  if (!selectedLobby) return;
 
+  const totalPlayers =
+    1 + selectedLobby.players.filter(p => p.id !== selectedLobby.creatorId).length; // creator + others
+
+  const hasMax =
+    selectedLobby.maxPlayers != null
+      ? totalPlayers >= selectedLobby.maxPlayers
+      : totalPlayers >= 2;
+
+  if (
+    selectedLobby.status === 'open' &&
+    hasMax &&
+    !selectedLobby.gameResult &&
+    autoStartLobbyId !== selectedLobby.id &&
+    countdown === null
+  ) {
+    setAutoStartLobbyId(selectedLobby.id);
+    setCountdown(10);
+  }
+}, [selectedLobby, autoStartLobbyId, countdown]);
+
+// --- Tick countdown and call /start from creator when it hits 0 ---
+useEffect(() => {
+  if (
+    countdown === null ||
+    !selectedLobby ||
+    autoStartLobbyId !== selectedLobby.id
+  ) {
+    return;
+  }
+
+  if (countdown <= 0) {
+    // Only creator actually starts the game
+    if (currentUser && currentUser.id === selectedLobby.creatorId) {
+      startGame(selectedLobby.id);
+    }
+    setCountdown(null);
+    setAutoStartLobbyId(null);
+    return;
+  }
+
+  const t = setTimeout(() => setCountdown(c => (c === null ? null : c - 1)), 1000);
+  return () => clearTimeout(t);
+}, [countdown, selectedLobby, autoStartLobbyId, currentUser, startGame as any]);
+
+// --- Reveal rolls one by one when a game result appears ---
+useEffect(() => {
+  if (!selectedLobby || !selectedLobby.gameResult) {
+    setRollRevealIndex(null);
+    return;
+  }
+
+  const players = selectedLobby.gameResult.players || [];
+  if (players.length === 0) {
+    setRollRevealIndex(null);
+    return;
+  }
+
+  setRollRevealIndex(0);
+  let i = 0;
+  const interval = setInterval(() => {
+    i += 1;
+    if (i >= players.length) {
+      clearInterval(interval);
+    } else {
+      setRollRevealIndex(i);
+    }
+  }, 800); // 0.8s between "turns"
+
+  return () => clearInterval(interval);
+}, [selectedLobby?.id, selectedLobby?.gameResult]);
   // ---- TonConnect: deposit / withdraw ----
 
   // --- DEPOSIT via TonConnect + backend ---
@@ -1330,16 +1406,19 @@ const shortAddress =
           Bet: {(selectedLobby.betAmount ?? 1).toFixed(2)} TON
         </p>
         <p style={{ marginTop: 10, fontSize: 13 }}>
-          Players:{' '}
-          {[
-            `${selectedLobby.creatorName} (creator)`,
-            ...selectedLobby.players
-              .filter(p => p.id !== selectedLobby.creatorId)
-              .map(
-                p => `${p.name} (${p.isReady ? 'ready' : 'not ready'})`,
-              ),
-          ].join(', ')}
-        </p>
+  Players:{' '}
+  {[
+    `${selectedLobby.creatorName} (creator)`,
+    ...selectedLobby.players
+      .filter(p => p.id !== selectedLobby.creatorId)
+      .map(p => p.name),
+  ].join(', ')}
+</p>
+{selectedLobby.status === 'open' && countdown !== null && (
+  <p style={{ fontSize: 14, color: '#facc15', marginTop: 8 }}>
+    Game starts in <b>{countdown}</b> seconds…
+  </p>
+)}
 
         {/* PIN for private lobbies */}
         {selectedLobby.isPrivate && (
@@ -1405,53 +1484,6 @@ const shortAddress =
               </button>
             )}
 
-            {/* READY SWITCH – only for players in lobby, not creator */}
-            {!isMeCreator && isMeInLobby && (
-              <button
-                onClick={() => toggleReady(selectedLobby.id)}
-                style={{
-                  padding: '8px 16px',
-                  minWidth: 120,
-                  borderRadius: 999,
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  background: isMeReady
-                    ? 'linear-gradient(135deg, #22c55e 0%, #4ade80 50%, #bbf7d0 100%)'
-                    : 'linear-gradient(135deg, #f97316 0%, #fb7185 50%, #fee2e2 100%)',
-                  color: isMeReady ? '#022c22' : '#111827',
-                  boxShadow: '0 0 12px rgba(0,0,0,0.4)',
-                  textAlign: 'center',
-                }}
-              >
-                {isMeReady ? 'Unready' : 'Ready'}
-              </button>
-            )}
-
-            {/* START GAME – only creator */}
-            {isMeCreator && (
-              <button
-                onClick={() => startGame(selectedLobby.id)}
-                style={{
-                  padding: '8px 16px',
-                  minWidth: 120,
-                  borderRadius: 999,
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  background:
-                    'linear-gradient(135deg, #22c55e 0%, #4ade80 50%, #bbf7d0 100%)',
-                  color: '#022c22',
-                  boxShadow: '0 0 12px rgba(0,0,0,0.4)',
-                  textAlign: 'center',
-                }}
-              >
-                Start game
-              </button>
-            )}
-
             {/* CANCEL LOBBY – only creator */}
             {isMeCreator && (
               <button
@@ -1487,12 +1519,20 @@ const shortAddress =
             </p>
 
             <ul>
-              {selectedGameResult.players.map(p => (
-                <li key={p.id}>
-                  {p.name}: rolled {p.roll}
-                </li>
-              ))}
-            </ul>
+  {selectedGameResult.players
+    .slice(
+      0,
+      rollRevealIndex == null
+        ? selectedGameResult.players.length
+        : rollRevealIndex + 1
+    )
+    .map((p, idx) => (
+      <li key={p.id}>
+        {idx === 0 ? '🎲 ' : ''}
+        {p.name}: rolled {p.roll}
+      </li>
+    ))}
+</ul>
 
             {Array.isArray((selectedGameResult as any).rounds) &&
               (selectedGameResult as any).rounds.length > 1 && (
