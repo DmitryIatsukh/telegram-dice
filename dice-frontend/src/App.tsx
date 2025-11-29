@@ -86,10 +86,6 @@ function DiceApp() {
   const [rollRevealIndex, setRollRevealIndex] = useState<number | null>(null)
   const [countdown, setCountdown] = useState<number | null>(null)
 
-  const [localLobbyNames, setLocalLobbyNames] = useState<Record<number, string>>(
-    {}
-  )
-
   // popups
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
@@ -165,21 +161,30 @@ function DiceApp() {
 
   // ---- backend: lobbies ----
   const loadLobbies = () => {
-    fetch(`${API}/lobbies`)
-      .then(res => res.json())
-      .then((data: Lobby[]) => {
-        const withNames = data.map(l => ({
-          ...l,
-          lobbyName:
-            localLobbyNames[l.id] ||
-            l.lobbyName ||
-            (l.name && !l.creatorName ? l.name : undefined)
-        }))
-        setLobbies(withNames)
-        setStatus('Loaded')
+  fetch(`${API}/lobbies`)
+    .then(res => res.json())
+    .then((data: Lobby[]) => {
+      setLobbies(prev => {
+        return data.map(l => {
+          const prevLobby = prev.find(p => p.id === l.id)
+
+          // what comes from backend (if it has any name at all)
+          const backendName =
+            l.lobbyName || (l as any).name || ''
+
+          // keep the old name if we already had one
+          const finalName = prevLobby?.lobbyName || backendName
+
+          return {
+            ...l,
+            lobbyName: finalName
+          }
+        })
       })
-      .catch(() => setStatus('Cannot reach backend'))
-  }
+      setStatus('Loaded')
+    })
+    .catch(() => setStatus('Cannot reach backend'))
+}
 
   useEffect(() => {
     loadLobbies()
@@ -429,34 +434,30 @@ function DiceApp() {
         return res.json()
       })
       .then((lobby: Lobby | null) => {
-        if (!lobby) return
+  if (!lobby) return
 
-        const finalName = lobbyName.trim() || `#${lobby.id}`
+  const finalName =
+    lobbyName.trim() || lobby.lobbyName || `#${lobby.id}`
 
-        setLocalLobbyNames(prev => ({
-          ...prev,
-          [lobby.id]: finalName
-        }))
+  const lobbyWithName: Lobby = {
+    ...lobby,
+    lobbyName: finalName
+  }
 
-        const lobbyWithName: Lobby = {
-          ...lobby,
-          lobbyName: finalName
-        }
+  setLobbies(prev => [...prev, lobbyWithName])
+  setSelectedLobbyId(lobbyWithName.id)
+  setCreatePin('')
+  setLobbyName('')
+  setCurrentPage('game')
+  setIsCreateModalOpen(false)
 
-        setLobbies(prev => [...prev, lobbyWithName])
-        setSelectedLobbyId(lobbyWithName.id)
-        setCreatePin('')
-        setLobbyName('')
-        setCurrentPage('game')
-        setIsCreateModalOpen(false)
-
-        setTimeout(() => {
-          joinLobby(
-            lobbyWithName.id,
-            createMode === 'private' ? createPin : undefined
-          )
-        }, 150)
-      })
+  setTimeout(() => {
+    joinLobby(
+      lobbyWithName.id,
+      createMode === 'private' ? createPin : undefined
+    )
+  }, 150)
+})
   }
 
   const joinLobby = (id: number, pin?: string) => {
