@@ -9,8 +9,7 @@ import {
 const API = '/api'
 const APP_WALLET = 'UQDRU4eufYrTa3Cqj-f2lOSUNJNT06V0RnANtOttEOUoEV8O'
 const API_BASE =
-  import.meta.env.VITE_BACKEND_URL || ""; // adjust port if needed
-
+  import.meta.env.VITE_BACKEND_URL || '' // adjust port if needed
 
 type Player = {
   id: string
@@ -34,8 +33,8 @@ type Lobby = {
   creatorId: string | null
   creatorName: string | null
   isPrivate: boolean
-  betAmount?: number      // 👈 NEW
-maxPlayers?: number 
+  betAmount?: number
+  maxPlayers?: number
   gameResult: GameResult
 }
 
@@ -53,10 +52,11 @@ type Page = 'lobbies' | 'profile' | 'game'
 
 function App() {
   const TON_MANIFEST_URL =
-  window.location.hostname === "localhost" ||
-  window.location.hostname.includes("ngrok")
-    ? "https://ton-connect.github.io/demo-dapp/tonconnect-manifest.json"
-    : `${window.location.origin}/tonconnect-manifest.json`;
+    window.location.hostname === 'localhost' ||
+    window.location.hostname.includes('ngrok')
+      ? 'https://ton-connect.github.io/demo-dapp/tonconnect-manifest.json'
+      : `${window.location.origin}/tonconnect-manifest.json`
+
   return (
     <TonConnectUIProvider manifestUrl={TON_MANIFEST_URL}>
       <DiceApp />
@@ -78,45 +78,40 @@ function DiceApp() {
   const [selectedLobbyId, setSelectedLobbyId] = useState<number | null>(null)
 
   const [createMode, setCreateMode] = useState<'public' | 'private'>('public')
-const [newLobbySize, setNewLobbySize] = useState<2 | 4>(4);
+  const [newLobbySize, setNewLobbySize] = useState<2 | 4>(4)
   const [createPin, setCreatePin] = useState('')
   const [joinPin, setJoinPin] = useState('')
-const [rollRevealIndex, setRollRevealIndex] = useState<number | null>(null);
-const [countdown, setCountdown] = useState<number | null>(null);
-const [autoStartLobbyId, setAutoStartLobbyId] = useState<number | null>(null);
-// --- bet amount when creating a new lobby ---
+  const [rollRevealIndex, setRollRevealIndex] = useState<number | null>(null)
+  const [countdown, setCountdown] = useState<number | null>(null)
+  const [autoStartLobbyId, setAutoStartLobbyId] = useState<number | null>(null)
 
-const [newLobbyBet, setNewLobbyBet] = useState<number>(1)
+  // --- bet amount when creating a new lobby ---
+  const [newLobbyBet, setNewLobbyBet] = useState<number>(1)
+
   const [tonBalance, setTonBalance] = useState<number>(0)
   const [history, setHistory] = useState<HistoryItem[]>([])
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-      const [userBets, setUserBets] = useState<Record<number, number>>({})
+  const [userBets, setUserBets] = useState<Record<number, number>>({})
 
   // NEW: holds
   const [heldBets, setHeldBets] = useState<Record<number, number>>({})
 
-  const totalHeld = Object.values(heldBets).reduce(
-    (sum, v) => sum + v,
-    0
-  )
+  const totalHeld = Object.values(heldBets).reduce((sum, v) => sum + v, 0)
   const availableBalance = tonBalance - totalHeld
+
   // to avoid applying the same game result multiple times
-  const [processedResults, setProcessedResults] = useState<string[]>([]);
+  const [processedResults, setProcessedResults] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState<Page>('lobbies')
   const [depositAmount, setDepositAmount] = useState('')
   const [withdrawAmount, setWithdrawAmount] = useState('')
-// for bet settlement (which lobbies we already applied balance for)
 
   const [tonConnectUI] = useTonConnectUI()
   const wallet = useTonWallet()
 
-const [isDepositing, setIsDepositing] = useState(false);
-const [isWithdrawing, setIsWithdrawing] = useState(false);
-
-
-// --- TON CONNECT EVENT HANDLER ---
+  const [isDepositing, setIsDepositing] = useState(false)
+  const [isWithdrawing, setIsWithdrawing] = useState(false)
 
   // ---- make background full-screen + Telegram theming ----
   useEffect(() => {
@@ -124,7 +119,6 @@ const [isWithdrawing, setIsWithdrawing] = useState(false);
     try {
       tg?.expand && tg.expand()
       tg?.setBackgroundColor && tg.setBackgroundColor('#000814')
-      // 'secondary' usually blends nicely with dark BG
       tg?.setHeaderColor && tg.setHeaderColor('secondary')
     } catch {
       // ignore if not in Telegram
@@ -164,68 +158,62 @@ const [isWithdrawing, setIsWithdrawing] = useState(false);
     }, 1500)
     return () => clearInterval(interval)
   }, [])
+
   // Auto-select a lobby where I am a player/creator after reload
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser) return
 
-    // find lobbies where I'm a player or the creator
     const myLobbies = lobbies.filter(
       l =>
         l.creatorId === currentUser.id ||
         l.players.some(p => p.id === currentUser.id)
-    );
+    )
 
-    // if nothing selected and there is at least one lobby -> pick the first
     if (selectedLobbyId == null && myLobbies.length > 0) {
-      setSelectedLobbyId(myLobbies[0].id);
-      setCurrentPage('game'); // jump straight to Game tab
+      setSelectedLobbyId(myLobbies[0].id)
+      setCurrentPage('game')
     }
-  }, [lobbies, currentUser, selectedLobbyId]);
-  const fetchWalletState = async (telegramId: string) => {
-  try {
-    const res = await fetch(`${API_BASE}/api/wallet/state/${telegramId}`);
-    if (!res.ok) return;
-        const data = await res.json()
-    setTonBalance(data.balance || 0)
-    setHistory((data.history || []) as HistoryItem[])
-  } catch (e) {
-    console.log("wallet state error", e);
-  }
-};
-useEffect(() => {
-  if (currentUser?.id) {
-    fetchWalletState(currentUser.id);
-  }
-}, [currentUser?.id]);
+  }, [lobbies, currentUser, selectedLobbyId])
 
+  const fetchWalletState = async (telegramId: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/wallet/state/${telegramId}`)
+      if (!res.ok) return
+      const data = await res.json()
+      setTonBalance(data.balance || 0)
+      setHistory((data.history || []) as HistoryItem[])
+    } catch (e) {
+      console.log('wallet state error', e)
+    }
+  }
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      fetchWalletState(currentUser.id)
+    }
+  }, [currentUser?.id])
 
   // ---- detect user from Telegram WebApp ----
+  useEffect(() => {
+    const tg = (window as any).Telegram?.WebApp
 
-  
+    console.log('TG WebApp object:', tg)
+    console.log('TG initData:', tg?.initData)
+    console.log('TG initDataUnsafe:', tg?.initDataUnsafe)
+    console.log('TG unsafe user:', tg?.initDataUnsafe?.user)
 
+    let user: any = tg?.initDataUnsafe?.user
 
-  // ---- decide when app is "ready" (for loading screen) ----
-    useEffect(() => {
-    const tg = (window as any).Telegram?.WebApp;
-
-    console.log("TG WebApp object:", tg);
-    console.log("TG initData:", tg?.initData);
-    console.log("TG initDataUnsafe:", tg?.initDataUnsafe);
-    console.log("TG unsafe user:", tg?.initDataUnsafe?.user);
-
-    let user: any = tg?.initDataUnsafe?.user;
-
-    // 🔁 Fallback: some clients only pass user in the raw initData string
     if (!user && tg?.initData) {
       try {
-        const params = new URLSearchParams(tg.initData);
-        const userParam = params.get("user");
+        const params = new URLSearchParams(tg.initData)
+        const userParam = params.get('user')
         if (userParam) {
-          user = JSON.parse(userParam);
-          console.log("Parsed user from initData:", user);
+          user = JSON.parse(userParam)
+          console.log('Parsed user from initData:', user)
         }
       } catch (err) {
-        console.log("Error parsing user from initData:", err);
+        console.log('Error parsing user from initData:', err)
       }
     }
 
@@ -237,17 +225,17 @@ useEffect(() => {
           (user.first_name && user.last_name
             ? `${user.first_name} ${user.last_name}`
             : user.first_name) ||
-          "Player",
+          'Player',
         username: user.username || null,
         avatarUrl: user.photo_url || null
-      });
+      })
 
-      tg?.ready && tg.ready();
+      tg?.ready && tg.ready()
     } else {
-      // No user found – we keep null, Profile will show the helper message
-      setCurrentUser(null);
+      setCurrentUser(null)
     }
-  }, []);
+  }, [])
+
   // Clean up holds when lobbies list changes (finished/cancelled/removed)
   useEffect(() => {
     setHeldBets(prev => {
@@ -266,275 +254,231 @@ useEffect(() => {
       return copy
     })
   }, [lobbies])
-// ---- apply game results to balance (with 5% house rake) + sync wallet ----
-useEffect(() => {
-  if (!currentUser) return
-  if (!lobbies || lobbies.length === 0) return
 
-  const newProcessed = new Set(processedResults)
-  let totalDelta = 0
-  const newHistory: HistoryItem[] = []
+  // ---- apply game results to balance (with 5% house rake) + sync wallet ----
+  useEffect(() => {
+    if (!currentUser) return
+    if (!lobbies || lobbies.length === 0) return
 
-  for (const lobby of lobbies) {
-    const gr = lobby.gameResult
-    if (!gr) continue
+    const newProcessed = new Set(processedResults)
+    let totalDelta = 0
+    const newHistory: HistoryItem[] = []
 
-    // unique key for this finished game
-    const key =
-      lobby.id +
-      ':' +
-      gr.winnerId +
-      ':' +
-      gr.highest +
-      ':' +
-      gr.players.map(p => `${p.id}:${p.roll}`).join(',')
+    for (const lobby of lobbies) {
+      const gr = lobby.gameResult
+      if (!gr) continue
 
-    if (newProcessed.has(key)) continue
+      const key =
+        lobby.id +
+        ':' +
+        gr.winnerId +
+        ':' +
+        gr.highest +
+        ':' +
+        gr.players.map(p => `${p.id}:${p.roll}`).join(',')
 
-    const players = gr.players
-    const nPlayers = players.length
+      if (newProcessed.has(key)) continue
 
-    // if current user is not in this game – just mark as processed
-    if (!players.some(p => p.id === currentUser.id)) {
-      newProcessed.add(key)
-      continue
-    }
+      const players = gr.players
+      const nPlayers = players.length
 
-    // bet for THIS user in this lobby
-    const betBase =
-      userBets[lobby.id] ??
-      (typeof lobby.betAmount === 'number' ? lobby.betAmount : 0)
-
-    if (!betBase || betBase <= 0) {
-      newProcessed.add(key)
-      continue
-    }
-
-    const isWinner = gr.winnerId === currentUser.id
-
-    // total pot = bet * number of players
-    const totalPot = betBase * nPlayers
-
-    // house rake 5% of total pot (only taken from winner)
-    const rake = isWinner ? totalPot * 0.05 : 0
-
-    // gross win for winner = pot - own bet
-    const grossWin = isWinner ? totalPot - betBase : 0
-
-    // net delta for this user
-    const netDelta = isWinner ? grossWin - rake : -betBase
-
-    totalDelta += netDelta
-
-    newHistory.push({
-      id: Date.now() + lobby.id + Math.random(),
-      type: 'bet',
-      amount: Math.abs(netDelta),
-      currency: 'TON',
-      result: isWinner ? 'win' : 'lose',
-      createdAt: new Date().toLocaleString(),
-      playerName: currentUser.name
-    })
-
-    newProcessed.add(key)
-  }
-
-  if (totalDelta !== 0 || newHistory.length > 0) {
-    const updatedBalance = tonBalance + totalDelta
-    const updatedHistory = [...newHistory, ...history]
-
-    setTonBalance(updatedBalance)
-    setHistory(updatedHistory)
-
-    // sync to backend
-    ;(async () => {
-      try {
-        await fetch(`${API_BASE}/api/wallet/sync`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            telegramId: currentUser.id,
-            username: currentUser.username || currentUser.name,
-            balance: updatedBalance,
-            history: updatedHistory
-          })
-        })
-      } catch (e) {
-        console.log('wallet sync error', e)
+      // if current user is not in this game – just mark as processed
+      if (!players.some(p => p.id === currentUser.id)) {
+        newProcessed.add(key)
+        continue
       }
-    })()
-  }
 
-  setProcessedResults(Array.from(newProcessed))
-}, [lobbies, currentUser, userBets, processedResults, tonBalance, history])
-    // ---- lobby actions ----
+      const betBase =
+        userBets[lobby.id] ??
+        (typeof lobby.betAmount === 'number' ? lobby.betAmount : 0)
+
+      if (!betBase || betBase <= 0) {
+        newProcessed.add(key)
+        continue
+      }
+
+      const isWinner = gr.winnerId === currentUser.id
+
+      const totalPot = betBase * nPlayers
+
+      const rake = isWinner ? totalPot * 0.05 : 0
+
+      const grossWin = isWinner ? totalPot - betBase : 0
+
+      const netDelta = isWinner ? grossWin - rake : -betBase
+
+      totalDelta += netDelta
+
+      newHistory.push({
+        id: Date.now() + lobby.id + Math.random(),
+        type: 'bet',
+        amount: Math.abs(netDelta),
+        currency: 'TON',
+        result: isWinner ? 'win' : 'lose',
+        createdAt: new Date().toLocaleString(),
+        playerName: currentUser.name
+      })
+
+      newProcessed.add(key)
+    }
+
+    if (totalDelta !== 0 || newHistory.length > 0) {
+      const updatedBalance = tonBalance + totalDelta
+      const updatedHistory = [...newHistory, ...history]
+
+      setTonBalance(updatedBalance)
+      setHistory(updatedHistory)
+
+      ;(async () => {
+        try {
+          await fetch(`${API_BASE}/api/wallet/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              telegramId: currentUser.id,
+              username: currentUser.username || currentUser.name,
+              balance: updatedBalance,
+              history: updatedHistory
+            })
+          })
+        } catch (e) {
+          console.log('wallet sync error', e)
+        }
+      })()
+    }
+
+    setProcessedResults(Array.from(newProcessed))
+  }, [lobbies, currentUser, userBets, processedResults, tonBalance, history])
+
+  // ---- lobby actions ----
 
   const createLobby = () => {
-  if (!currentUser) return
+    if (!currentUser) return
 
-  if (newLobbyBet <= 0) {
-    setErrorMessage('Bet must be greater than 0')
-    return
-  }
+    if (newLobbyBet <= 0) {
+      setErrorMessage('Bet must be greater than 0')
+      return
+    }
 
-   if (newLobbyBet > availableBalance) {
-    setErrorMessage(
-      "You don't have enough available balance for this bet (some funds may be held in other lobbies)"
-    )
-    return
-  }
+    if (newLobbyBet > availableBalance) {
+      setErrorMessage(
+        "You don't have enough available balance for this bet (some funds may be held in other lobbies)"
+      )
+      return
+    }
 
-  if (createMode === 'private' && !/^\d{4}$/.test(createPin)) {
-    setErrorMessage('Private lobby needs a 4-digit PIN')
-    return
-  }
+    if (createMode === 'private' && !/^\d{4}$/.test(createPin)) {
+      setErrorMessage('Private lobby needs a 4-digit PIN')
+      return
+    }
 
-  // Enforce minimum bet 0.1 TON logically
-  const betToSend = newLobbyBet >= 0.1 ? newLobbyBet : 0.1
+    const betToSend = newLobbyBet >= 0.1 ? newLobbyBet : 0.1
 
-  fetch(`${API}/lobbies/create`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      userId: currentUser.id,
-      name: currentUser.username || currentUser.name,
-      isPrivate: createMode === 'private',
-      pin: createMode === 'private' ? createPin : undefined,
-
-      // these two are what the backend should care about
-      betAmount: betToSend,
-      maxPlayers: newLobbySize,
-    }),
-  })
-    .then(async res => {
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        console.log('createLobby error', res.status, err)
-        setErrorMessage(
-          err.error || `Error creating lobby (code ${res.status})`
-        )
-        return null
-      }
-      return res.json()
+    fetch(`${API}/lobbies/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: currentUser.id,
+        name: currentUser.username || currentUser.name,
+        isPrivate: createMode === 'private',
+        pin: createMode === 'private' ? createPin : undefined,
+        betAmount: betToSend,
+        maxPlayers: newLobbySize
+      })
     })
-    .then((lobby: Lobby | null) => {
-      if (!lobby) return
-
-      // add lobby and open game page
-      setLobbies(prev => [...prev, lobby])
-      setSelectedLobbyId(lobby.id)
-      setCreatePin('')
-      setCurrentPage('game')
-
-      // auto-join creator
-      if (currentUser) {
-        setTimeout(() => {
-          joinLobby(
-            lobby.id,
-            createMode === 'private' ? createPin : undefined
+      .then(async res => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          console.log('createLobby error', res.status, err)
+          setErrorMessage(
+            err.error || `Error creating lobby (code ${res.status})`
           )
-        }, 150)
-      }
-    })
-}
+          return null
+        }
+        return res.json()
+      })
+      .then((lobby: Lobby | null) => {
+        if (!lobby) return
+
+        setLobbies(prev => [...prev, lobby])
+        setSelectedLobbyId(lobby.id)
+        setCreatePin('')
+        setCurrentPage('game')
+
+        if (currentUser) {
+          setTimeout(() => {
+            joinLobby(
+              lobby.id,
+              createMode === 'private' ? createPin : undefined
+            )
+          }, 150)
+        }
+      })
+  }
 
   const joinLobby = (id: number, pin?: string) => {
-  if (!currentUser) return
+    if (!currentUser) return
 
-  // try to read bet from local lobby list, fall back to 0.1
-  const lobby = lobbies.find(l => l.id === id)
-  const lobbyBet = lobby?.betAmount ?? 0.1
+    const lobby = lobbies.find(l => l.id === id)
+    const lobbyBet = lobby?.betAmount ?? 0.1
 
-    // 💰 check *available* balance vs bet
-  if (availableBalance < lobbyBet) {
-    setErrorMessage(
-      `You need at least ${lobbyBet.toFixed(
-        2
-      )} TON available to join (some funds may be held in other lobbies).`
-    )
-    return
-  }
+    if (availableBalance < lobbyBet) {
+      setErrorMessage(
+        `You need at least ${lobbyBet.toFixed(
+          2
+        )} TON available to join (some funds may be held in other lobbies).`
+      )
+      return
+    }
 
-  // Optional: auto-set your bet to the lobby's bet
-  setUserBets(prev => ({
-    ...prev,
-    [id]: lobbyBet
-  }))
+    setUserBets(prev => ({
+      ...prev,
+      [id]: lobbyBet
+    }))
 
-  fetch(`${API}/lobbies/${id}/join`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      userId: currentUser.id,
-      name: currentUser.name,
-      pin
+    fetch(`${API}/lobbies/${id}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: currentUser.id,
+        name: currentUser.name,
+        pin
+      })
     })
-  })
-    .then(async res => {
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        setErrorMessage(err.error || 'Cannot join lobby')
-        return null
-      }
-      return res.json()
-    })
-       .then((lobby: Lobby | null) => {
-      if (!lobby) return
-
-      setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
-      setJoinPin('')
-      setSelectedLobbyId(lobby.id)
-      setCurrentPage('game')
-
-      // ⭐ HOLD: if we weren’t already holding for this lobby and we’re in it now,
-      // reserve the lobby bet for this user
-      if (currentUser) {
-        const meNow = lobby.players.find(p => p.id === currentUser.id)
-        if (meNow && !heldBets[lobby.id]) {
-          const bet =
-            typeof lobby.betAmount === 'number' && lobby.betAmount > 0
-              ? lobby.betAmount
-              : lobbyBet
-
-          setHeldBets(prev => ({
-            ...prev,
-            [lobby.id]: bet
-          }))
+      .then(async res => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          setErrorMessage(err.error || 'Cannot join lobby')
+          return null
         }
-      }
-    })
-}
+        return res.json()
+      })
+      .then((lobby: Lobby | null) => {
+        if (!lobby) return
 
+        setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
+        setJoinPin('')
+        setSelectedLobbyId(lobby.id)
+        setCurrentPage('game')
 
-  // minimum bet: lobby base bet (if exists) OR 0.1
-  const minBet =
-    lobby.betAmount != null && lobby.betAmount > 0 ? lobby.betAmount : 0.1
+        if (currentUser) {
+          const meNow = lobby.players.find(p => p.id === currentUser.id)
+          if (meNow && !heldBets[lobby.id]) {
+            const bet =
+              typeof lobby.betAmount === 'number' && lobby.betAmount > 0
+                ? lobby.betAmount
+                : lobbyBet
 
-  if (userBet < minBet) {
-    setErrorMessage(
-      `Set your bet (at least ${minBet.toFixed(2)} TON) before readying up`
-    )
-    return Promise.resolve(null)
+            setHeldBets(prev => ({
+              ...prev,
+              [lobby.id]: bet
+            }))
+          }
+        }
+      })
   }
 
-  if (userBet > tonBalance) {
-    setErrorMessage('Not enough balance for this bet.')
-    return Promise.resolve(null)
-  }
-
-  return fetch(`${API}/lobbies/${id}/toggle-ready`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId: currentUser.id })
-  })
-    .then(res => res.json())
-    .then((lobby: Lobby) => {
-      setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
-      return lobby
-    })
-}
-
-    const startGame = (id: number) => {
+  const startGame = (id: number) => {
     if (!currentUser) return
     fetch(`${API}/lobbies/${id}/start`, {
       method: 'POST',
@@ -553,284 +497,284 @@ useEffect(() => {
         if (!lobby) return
         setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
 
-        // 🔄 refresh wallet (balance + history) after game
         if (currentUser?.id) {
           fetchWalletState(currentUser.id)
         }
       })
   }
-const leaveLobby = (id: number) => {
-  if (!currentUser) return
 
-  fetch(`${API}/lobbies/${id}/leave`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId: currentUser.id })
-  })
-    .then(async res => {
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        setErrorMessage(err.error || 'Cannot leave lobby')
-        return null
-      }
-      return res.json()
+  const leaveLobby = (id: number) => {
+    if (!currentUser) return
+
+    fetch(`${API}/lobbies/${id}/leave`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: currentUser.id })
     })
-        .then((lobby: Lobby | null) => {
-      if (!lobby) return
-      setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
-
-      // ⭐ RELEASE: if we are no longer in this lobby, release the held bet
-      if (currentUser) {
-        const stillIn = lobby.players.some(p => p.id === currentUser.id)
-        if (!stillIn) {
-          setHeldBets(prev => {
-            const copy = { ...prev }
-            delete copy[id]
-            return copy
-          })
+      .then(async res => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          setErrorMessage(err.error || 'Cannot leave lobby')
+          return null
         }
-      }
-    })
-}
-
-const cancelLobby = (id: number) => {
-  if (!currentUser) return
-
-  fetch(`${API}/lobbies/${id}/cancel`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId: currentUser.id })
-  })
-    .then(async res => {
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        setErrorMessage(err.error || 'Cannot cancel lobby')
-        return
-      }
-      // remove lobby from list and close popup
-      setLobbies(prev => prev.filter(l => l.id !== id))
-      setSelectedLobbyId(null)
-// ⭐ RELEASE: cancel = everyone refunded
-      setHeldBets(prev => {
-        const copy = { ...prev }
-        delete copy[id]
-        return copy
+        return res.json()
       })
+      .then((lobby: Lobby | null) => {
+        if (!lobby) return
+        setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
+
+        if (currentUser) {
+          const stillIn = lobby.players.some(p => p.id === currentUser.id)
+          if (!stillIn) {
+            setHeldBets(prev => {
+              const copy = { ...prev }
+              delete copy[id]
+              return copy
+            })
+          }
+        }
+      })
+  }
+
+  const cancelLobby = (id: number) => {
+    if (!currentUser) return
+
+    fetch(`${API}/lobbies/${id}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: currentUser.id })
     })
-}
-    const selectedLobby =
+      .then(async res => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          setErrorMessage(err.error || 'Cannot cancel lobby')
+          return
+        }
+        setLobbies(prev => prev.filter(l => l.id !== id))
+        setSelectedLobbyId(null)
+
+        setHeldBets(prev => {
+          const copy = { ...prev }
+          delete copy[id]
+          return copy
+        })
+      })
+  }
+
+  const selectedLobby =
     selectedLobbyId != null
       ? lobbies.find(l => l.id === selectedLobbyId) || null
       : null
-  
+
   const meInSelectedLobby =
-  currentUser && selectedLobby
-    ? selectedLobby.players.find(p => p.id === currentUser.id)
-    : undefined;
+    currentUser && selectedLobby
+      ? selectedLobby.players.find(p => p.id === currentUser.id)
+      : undefined
 
-const isMeInLobby = !!meInSelectedLobby;
+  const isMeInLobby = !!meInSelectedLobby
   const isMeCreator =
-    !!currentUser && !!selectedLobby && currentUser.id === selectedLobby.creatorId
-// --- Auto-start countdown when lobby is full ---
-useEffect(() => {
-  if (!selectedLobby) return;
+    !!currentUser &&
+    !!selectedLobby &&
+    currentUser.id === selectedLobby.creatorId
 
-  const totalPlayers =
-    1 + selectedLobby.players.filter(p => p.id !== selectedLobby.creatorId).length; // creator + others
+  // --- Auto-start countdown when lobby is full ---
+  useEffect(() => {
+    if (!selectedLobby) return
 
-  const hasMax =
-    selectedLobby.maxPlayers != null
-      ? totalPlayers >= selectedLobby.maxPlayers
-      : totalPlayers >= 2;
+    const totalPlayers =
+      1 +
+      selectedLobby.players.filter(p => p.id !== selectedLobby.creatorId)
+        .length
 
-  if (
-    selectedLobby.status === 'open' &&
-    hasMax &&
-    !selectedLobby.gameResult &&
-    autoStartLobbyId !== selectedLobby.id &&
-    countdown === null
-  ) {
-    setAutoStartLobbyId(selectedLobby.id);
-    setCountdown(10);
-  }
-}, [selectedLobby, autoStartLobbyId, countdown]);
+    const hasMax =
+      selectedLobby.maxPlayers != null
+        ? totalPlayers >= selectedLobby.maxPlayers
+        : totalPlayers >= 2
 
-// --- Tick countdown and call /start from creator when it hits 0 ---
-useEffect(() => {
-  if (
-    countdown === null ||
-    !selectedLobby ||
-    autoStartLobbyId !== selectedLobby.id
-  ) {
-    return;
-  }
-
-  if (countdown <= 0) {
-    // Only creator actually starts the game
-    if (currentUser && currentUser.id === selectedLobby.creatorId) {
-      startGame(selectedLobby.id);
+    if (
+      selectedLobby.status === 'open' &&
+      hasMax &&
+      !selectedLobby.gameResult &&
+      autoStartLobbyId !== selectedLobby.id &&
+      countdown === null
+    ) {
+      setAutoStartLobbyId(selectedLobby.id)
+      setCountdown(10)
     }
-    setCountdown(null);
-    setAutoStartLobbyId(null);
-    return;
-  }
+  }, [selectedLobby, autoStartLobbyId, countdown])
 
-  const t = setTimeout(() => setCountdown(c => (c === null ? null : c - 1)), 1000);
-  return () => clearTimeout(t);
-}, [countdown, selectedLobby, autoStartLobbyId, currentUser, startGame as any]);
-
-// --- Reveal rolls one by one when a game result appears ---
-useEffect(() => {
-  if (!selectedLobby || !selectedLobby.gameResult) {
-    setRollRevealIndex(null);
-    return;
-  }
-
-  const players = selectedLobby.gameResult.players || [];
-  if (players.length === 0) {
-    setRollRevealIndex(null);
-    return;
-  }
-
-  setRollRevealIndex(0);
-  let i = 0;
-  const interval = setInterval(() => {
-    i += 1;
-    if (i >= players.length) {
-      clearInterval(interval);
-    } else {
-      setRollRevealIndex(i);
+  // --- Tick countdown and call /start from creator when it hits 0 ---
+  useEffect(() => {
+    if (
+      countdown === null ||
+      !selectedLobby ||
+      autoStartLobbyId !== selectedLobby.id
+    ) {
+      return
     }
-  }, 800); // 0.8s between "turns"
 
-  return () => clearInterval(interval);
-}, [selectedLobby?.id, selectedLobby?.gameResult]);
+    if (countdown <= 0) {
+      if (currentUser && currentUser.id === selectedLobby.creatorId) {
+        startGame(selectedLobby.id)
+      }
+      setCountdown(null)
+      setAutoStartLobbyId(null)
+      return
+    }
+
+    const t = setTimeout(
+      () => setCountdown(c => (c === null ? null : c - 1)),
+      1000
+    )
+    return () => clearTimeout(t)
+  }, [countdown, selectedLobby, autoStartLobbyId, currentUser, startGame as any])
+
+  // --- Reveal rolls one by one when a game result appears ---
+  useEffect(() => {
+    if (!selectedLobby || !selectedLobby.gameResult) {
+      setRollRevealIndex(null)
+      return
+    }
+
+    const players = selectedLobby.gameResult.players || []
+    if (players.length === 0) {
+      setRollRevealIndex(null)
+      return
+    }
+
+    setRollRevealIndex(0)
+    let i = 0
+    const interval = setInterval(() => {
+      i += 1
+      if (i >= players.length) {
+        clearInterval(interval)
+      } else {
+        setRollRevealIndex(i)
+      }
+    }, 800)
+
+    return () => clearInterval(interval)
+  }, [selectedLobby?.id, selectedLobby?.gameResult])
+
   // ---- TonConnect: deposit / withdraw ----
 
-  // --- DEPOSIT via TonConnect + backend ---
-const handleDeposit = async () => {
-  if (!currentUser || !tonConnectUI) {
-    setErrorMessage("Connect Telegram and TON wallet first.");
-    return;
-  }
-
-  if (!depositAmount || Number(depositAmount) <= 0) {
-    setErrorMessage("Enter deposit amount first.");
-    return;
-  }
-
-  const amountNumber = Number(depositAmount);
-
-  try {
-    setErrorMessage(null);
-    setIsDepositing(true);
-
-    // 1) Send real TON from user's wallet to app wallet
-    const nanoAmount = BigInt(Math.floor(amountNumber * 1e9)); // 1 TON = 1e9 nanoTON
-
-    await tonConnectUI.sendTransaction({
-      validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes
-      messages: [
-        {
-          address: APP_WALLET,
- // you already defined this earlier
-          amount: nanoAmount.toString(),
-        },
-      ],
-    });
-
-    // 2) Notify backend & update internal balance
-    const res = await fetch(`${API_BASE}/api/wallet/deposit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        telegramId: currentUser.id,
-        username: currentUser.username || currentUser.name,
-        amount: amountNumber,
-        txHash: null, // TonConnect v2 doesn't give hash easily; we store null for now
-      }),
-    });
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || "Deposit failed on server");
+  const handleDeposit = async () => {
+    if (!currentUser || !tonConnectUI) {
+      setErrorMessage('Connect Telegram and TON wallet first.')
+      return
     }
 
-    const data = await res.json();
-    setTonBalance(data.balance || 0)
-    setHistory((data.history || []) as HistoryItem[])
-
-    setDepositAmount("");
-  } catch (err: any) {
-    console.error("Deposit error:", err);
-    setErrorMessage(err?.message || "Deposit failed");
-  } finally {
-    setIsDepositing(false);
-  }
-};
-
-
-  // --- WITHDRAW request (internal) ---
-const handleWithdraw = async () => {
-  if (!currentUser) {
-    setErrorMessage("Telegram user not detected.");
-    return;
-  }
-
-  if (!withdrawAmount || Number(withdrawAmount) <= 0) {
-    setErrorMessage("Enter withdraw amount first.");
-    return;
-  }
-
-    const amountNumber = Number(withdrawAmount);
-
-  if (amountNumber > availableBalance) {
-    setErrorMessage(
-      `You can withdraw at most ${availableBalance.toFixed(
-        2
-      )} TON (the rest is held in active lobbies).`
-    );
-    return;
-  }
-
-  try {
-    setErrorMessage(null);
-    setIsWithdrawing(true);
-
-    const res = await fetch(`${API_BASE}/api/wallet/withdraw`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        telegramId: currentUser.id,
-        username: currentUser.username || currentUser.name,
-        amount: amountNumber,
-        walletAddress: null, // no TonConnect required yet
-      }),
-    });
-
-    const data = await res.json();
-    if (!res.ok || !data.ok) {
-      throw new Error(data.error || "Withdraw failed on server");
+    if (!depositAmount || Number(depositAmount) <= 0) {
+      setErrorMessage('Enter deposit amount first.')
+      return
     }
 
-    setTonBalance(data.balance || 0)
-    setHistory((data.history || []) as HistoryItem[])
-    setWithdrawAmount('')
+    const amountNumber = Number(depositAmount)
 
-    setErrorMessage("Withdraw request created ✅. TON will be sent soon.");
-  } catch (err: any) {
-    console.error("Withdraw error:", err);
-    setErrorMessage(err?.message || "Withdraw failed");
-  } finally {
-    setIsWithdrawing(false);
+    try {
+      setErrorMessage(null)
+      setIsDepositing(true)
+
+      const nanoAmount = BigInt(Math.floor(amountNumber * 1e9))
+
+      await tonConnectUI.sendTransaction({
+        validUntil: Math.floor(Date.now() / 1000) + 300,
+        messages: [
+          {
+            address: APP_WALLET,
+            amount: nanoAmount.toString()
+          }
+        ]
+      })
+
+      const res = await fetch(`${API_BASE}/api/wallet/deposit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegramId: currentUser.id,
+          username: currentUser.username || currentUser.name,
+          amount: amountNumber,
+          txHash: null
+        })
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Deposit failed on server')
+      }
+
+      const data = await res.json()
+      setTonBalance(data.balance || 0)
+      setHistory((data.history || []) as HistoryItem[])
+      setDepositAmount('')
+    } catch (err: any) {
+      console.error('Deposit error:', err)
+      setErrorMessage(err?.message || 'Deposit failed')
+    } finally {
+      setIsDepositing(false)
+    }
   }
-};
 
-    // ---- sync wallet to backend whenever balance or history change ----
+  const handleWithdraw = async () => {
+    if (!currentUser) {
+      setErrorMessage('Telegram user not detected.')
+      return
+    }
+
+    if (!withdrawAmount || Number(withdrawAmount) <= 0) {
+      setErrorMessage('Enter withdraw amount first.')
+      return
+    }
+
+    const amountNumber = Number(withdrawAmount)
+
+    if (amountNumber > availableBalance) {
+      setErrorMessage(
+        `You can withdraw at most ${availableBalance.toFixed(
+          2
+        )} TON (the rest is held in active lobbies).`
+      )
+      return
+    }
+
+    try {
+      setErrorMessage(null)
+      setIsWithdrawing(true)
+
+      const res = await fetch(`${API_BASE}/api/wallet/withdraw`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegramId: currentUser.id,
+          username: currentUser.username || currentUser.name,
+          amount: amountNumber,
+          walletAddress: null
+        })
+      })
+
+      const data = await res.json()
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || 'Withdraw failed on server')
+      }
+
+      setTonBalance(data.balance || 0)
+      setHistory((data.history || []) as HistoryItem[])
+      setWithdrawAmount('')
+
+      setErrorMessage('Withdraw request created ✅. TON will be sent soon.')
+    } catch (err: any) {
+      console.error('Withdraw error:', err)
+      setErrorMessage(err?.message || 'Withdraw failed')
+    } finally {
+      setIsWithdrawing(false)
+    }
+  }
+
+  // ---- sync wallet to backend whenever balance or history change ----
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser) return
 
-    (async () => {
+    ;(async () => {
       try {
         await fetch(`${API_BASE}/api/wallet/sync`, {
           method: 'POST',
@@ -839,107 +783,103 @@ const handleWithdraw = async () => {
             telegramId: currentUser.id,
             username: currentUser.username || currentUser.name,
             balance: tonBalance,
-            history,
-          }),
-        });
+            history
+          })
+        })
       } catch (e) {
-        console.log('wallet sync error', e);
+        console.log('wallet sync error', e)
       }
-    })();
-  }, [currentUser, tonBalance, history]);
-
-  // ---- loading screen ----
+    })()
+  }, [currentUser, tonBalance, history])
 
   // ---------------- LOADING SCREEN (ONLY backend, not user) ----------------
-const spinnerStyles = `
+  const spinnerStyles = `
 @keyframes dice-spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
-`;
+`
 
-if (status === 'Loading...') {
-  return (
-    <>
-      <style>{spinnerStyles}</style>
-      <div
-        style={{
-          fontFamily: 'sans-serif',
-          minHeight: '100vh',
-          background:
-            'radial-gradient(circle at top, #0044cc 0%, #001b4d 40%, #000814 100%)',
-          color: '#fff',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 14,
-          textAlign: 'center'
-        }}
-      >
+  if (status === 'Loading...') {
+    return (
+      <>
+        <style>{spinnerStyles}</style>
         <div
           style={{
-            fontSize: 28,
-            fontWeight: 800,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            textShadow: '0 0 12px #ff0080cc'
-          }}
-        >
-          The Dice
-        </div>
-        <div
-          style={{
-            width: 70,
-            height: 70,
-            borderRadius: '50%',
+            fontFamily: 'sans-serif',
+            minHeight: '100vh',
             background:
-              'radial-gradient(circle at 30% 30%, #ffffff 0%, #ffe4f2 35%, #f472b6 70%, #7c2d89 100%)',
+              'radial-gradient(circle at top, #0044cc 0%, #001b4d 40%, #000814 100%)',
+            color: '#fff',
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 0 20px rgba(255,0,128,0.9)',
-            animation: 'dice-spin 1.1s linear infinite'
+            gap: 14,
+            textAlign: 'center'
           }}
         >
-          <span style={{ fontSize: 36 }}>🎲</span>
+          <div
+            style={{
+              fontSize: 28,
+              fontWeight: 800,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              textShadow: '0 0 12px #ff0080cc'
+            }}
+          >
+            The Dice
+          </div>
+          <div
+            style={{
+              width: 70,
+              height: 70,
+              borderRadius: '50%',
+              background:
+                'radial-gradient(circle at 30% 30%, #ffffff 0%, #ffe4f2 35%, #f472b6 70%, #7c2d89 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 0 20px rgba(255,0,128,0.9)',
+              animation: 'dice-spin 1.1s linear infinite'
+            }}
+          >
+            <span style={{ fontSize: 36 }}>🎲</span>
+          </div>
+          <div style={{ fontSize: 13, color: '#d1d5db' }}>
+            Loading your lucky table...
+          </div>
         </div>
-        <div style={{ fontSize: 13, color: '#d1d5db' }}>
-          Loading your lucky table...
-        </div>
-      </div>
-    </>
-  )
-}
-
+      </>
+    )
+  }
 
   // ---- profile page ----
 
   const renderProfilePage = () => {
     if (!currentUser) {
-  return (
-    <div style={{ padding: 20, textAlign: 'center' }}>
-      <div style={{ fontSize: 16, marginBottom: 10 }}>
-        Telegram user not detected
-      </div>
-      <div style={{ fontSize: 13, opacity: 0.7 }}>
-        Open this app through your bot’s WebApp button.
-      </div>
-      <div style={{ marginTop: 20 }}>
-        <TonConnectButton />
-      </div>
-    </div>
-  );
-}
+      return (
+        <div style={{ padding: 20, textAlign: 'center' }}>
+          <div style={{ fontSize: 16, marginBottom: 10 }}>
+            Telegram user not detected
+          </div>
+          <div style={{ fontSize: 13, opacity: 0.7 }}>
+            Open this app through your bot’s WebApp button.
+          </div>
+          <div style={{ marginTop: 20 }}>
+            <TonConnectButton />
+          </div>
+        </div>
+      )
+    }
 
-const initial = currentUser.name.charAt(0).toUpperCase();
-const shortAddress =
-  wallet?.account?.address && wallet.account.address.length > 12
-    ? wallet.account.address.slice(0, 6) +
-      '...' +
-      wallet.account.address.slice(-4)
-    : wallet?.account?.address;
-
+    const initial = currentUser.name.charAt(0).toUpperCase()
+    const shortAddress =
+      wallet?.account?.address && wallet.account.address.length > 12
+        ? wallet.account.address.slice(0, 6) +
+          '...' +
+          wallet.account.address.slice(-4)
+        : wallet?.account?.address
 
     return (
       <div style={{ padding: 10, paddingBottom: 40 }}>
@@ -965,10 +905,10 @@ const shortAddress =
               boxShadow: '0 0 12px rgba(255,0,128,0.9)'
             }}
           >
-            {currentUser!.avatarUrl ? (
+            {currentUser.avatarUrl ? (
               <img
-                src={currentUser!.avatarUrl}
-                alt="Avatar"
+                src={currentUser.avatarUrl}
+                alt='Avatar'
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             ) : (
@@ -977,9 +917,9 @@ const shortAddress =
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 13, color: '#b197fc' }}>
-              {currentUser!.username
-                ? '@' + currentUser!.username
-                : currentUser!.name}
+              {currentUser.username
+                ? '@' + currentUser.username
+                : currentUser.name}
             </div>
             <div
               style={{
@@ -988,7 +928,7 @@ const shortAddress =
                 textShadow: '0 0 8px rgba(255,255,255,0.3)'
               }}
             >
-              {currentUser!.name}
+              {currentUser.name}
             </div>
             <div style={{ marginTop: 6, fontSize: 11, color: '#a5b4fc' }}>
               {wallet ? (
@@ -1039,7 +979,7 @@ const shortAddress =
             </div>
           </div>
 
-                   <div
+          <div
             style={{
               display: 'flex',
               alignItems: 'flex-start',
@@ -1077,7 +1017,7 @@ const shortAddress =
                 </span>
                 TON balance
               </div>
-                            <div
+              <div
                 style={{
                   fontSize: 26,
                   fontWeight: 700,
@@ -1093,8 +1033,7 @@ const shortAddress =
                   marginTop: 2
                 }}
               >
-                Total: {tonBalance.toFixed(2)} TON · Held:{' '}
-                {totalHeld.toFixed(2)} TON
+                Total: {tonBalance.toFixed(2)} TON · Held: {totalHeld.toFixed(2)} TON
               </div>
             </div>
 
@@ -1106,28 +1045,28 @@ const shortAddress =
                   💰 Deposit (TonConnect)
                 </div>
                 <div
-  style={{
-    display: 'flex',
-    gap: 6,
-    flexWrap: 'wrap',      // allow wrapping on small screens
-    alignItems: 'center'
-  }}
->
+                  style={{
+                    display: 'flex',
+                    gap: 6,
+                    flexWrap: 'wrap',
+                    alignItems: 'center'
+                  }}
+                >
                   <input
-                    placeholder="Amount"
+                    placeholder='Amount'
                     value={depositAmount}
                     onChange={e => setDepositAmount(e.target.value)}
                     style={{
-    flex: '1 1 130px',
-    minWidth: 130,
-    padding: '4px 8px',
-    borderRadius: 6,
-    border: '1px solid #555',
-    background: '#050511',
-    color: '#fff',
-    fontSize: 12
-  }}
-/>
+                      flex: '1 1 130px',
+                      minWidth: 130,
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      border: '1px solid #555',
+                      background: '#050511',
+                      color: '#fff',
+                      fontSize: 12
+                    }}
+                  />
                   <button
                     onClick={handleDeposit}
                     disabled={isDepositing}
@@ -1143,7 +1082,7 @@ const shortAddress =
                       cursor: isDepositing ? 'wait' : 'pointer',
                       whiteSpace: 'nowrap',
                       opacity: isDepositing ? 0.6 : 1,
-                       width: 'auto',   
+                      width: 'auto',
                       textAlign: 'center'
                     }}
                   >
@@ -1166,12 +1105,12 @@ const shortAddress =
                   }}
                 >
                   <input
-                    placeholder="Amount"
+                    placeholder='Amount'
                     value={withdrawAmount}
                     onChange={e => setWithdrawAmount(e.target.value)}
                     style={{
                       flex: '1 1 130px',
-    minWidth: 130,
+                      minWidth: 130,
                       padding: '4px 8px',
                       borderRadius: 6,
                       border: '1px solid #555',
@@ -1195,7 +1134,7 @@ const shortAddress =
                       cursor: isWithdrawing ? 'wait' : 'pointer',
                       whiteSpace: 'nowrap',
                       opacity: isWithdrawing ? 0.6 : 1,
-                      width: 'auto', 
+                      width: 'auto',
                       textAlign: 'center'
                     }}
                   >
@@ -1278,7 +1217,7 @@ const shortAddress =
                       'linear-gradient(135deg, rgba(0,25,60,0.9), rgba(0,15,40,0.95))',
                     borderRadius: 10,
                     padding: 10,
-                    border: '1px solid rgba(0,150,255,0.20)',
+                    border: '1px solid rgba(0,150,255,0.2)',
                     marginBottom: 8,
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -1334,15 +1273,15 @@ const shortAddress =
     )
   }
 
-    // ---- single game / lobby page ----
+  // ---- single game / lobby page ----
 
   const renderGamePage = () => {
     if (!selectedLobby) {
       return (
         <div style={{ padding: 16 }}>
           <p style={{ fontSize: 14 }}>
-            You are not in any lobby yet. Go to the Lobbies tab and join or
-            create one.
+            You are not in any lobby yet. Go to the Lobbies tab and join or create
+            one.
           </p>
         </div>
       )
@@ -1355,37 +1294,36 @@ const shortAddress =
       <div
         style={{
           padding: 16,
-          paddingBottom: 40,
+          paddingBottom: 40
         }}
       >
         <div
-  style={{
-    display: 'flex',
-    alignItems: 'center',
-    marginBottom: 8,
-  }}
->
-  <h3>
-    Lobby #{selectedLobby.id}{' '}
-    {selectedLobby.isPrivate && (
-      <span
-        style={{
-          fontSize: 11,
-          background:
-            'linear-gradient(135deg, #ff4d6a 0%, #ff9a9e 100%)',
-          padding: '2px 8px',
-          borderRadius: 999,
-          marginLeft: 6,
-          color: '#111',
-        }}
-      >
-        Private
-      </span>
-    )}
-  </h3>
-</div>
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            marginBottom: 8
+          }}
+        >
+          <h3>
+            Lobby #{selectedLobby.id}{' '}
+            {selectedLobby.isPrivate && (
+              <span
+                style={{
+                  fontSize: 11,
+                  background:
+                    'linear-gradient(135deg, #ff4d6a 0%, #ff9a9e 100%)',
+                  padding: '2px 8px',
+                  borderRadius: 999,
+                  marginLeft: 6,
+                  color: '#111'
+                }}
+              >
+                Private
+              </span>
+            )}
+          </h3>
+        </div>
 
-        {/* INFO */}
         <p style={{ fontSize: 13, color: '#ccc' }}>
           Status: {selectedLobby.status}
         </p>
@@ -1396,54 +1334,49 @@ const shortAddress =
           Bet: {(selectedLobby.betAmount ?? 1).toFixed(2)} TON
         </p>
         <p style={{ marginTop: 10, fontSize: 13 }}>
-  Players:{' '}
-  {[
-    `${selectedLobby.creatorName} (creator)`,
-    ...selectedLobby.players
-      .filter(p => p.id !== selectedLobby.creatorId)
-      .map(p => p.name),
-  ].join(', ')}
-</p>
-{selectedLobby.status === 'open' && countdown !== null && (
-  <p style={{ fontSize: 14, color: '#facc15', marginTop: 8 }}>
-    Game starts in <b>{countdown}</b> seconds…
-  </p>
-)}
+          Players:{' '}
+          {[
+            `${selectedLobby.creatorName} (creator)`,
+            ...selectedLobby.players
+              .filter(p => p.id !== selectedLobby.creatorId)
+              .map(p => p.name)
+          ].join(', ')}
+        </p>
+        {selectedLobby.status === 'open' && countdown !== null && (
+          <p style={{ fontSize: 14, color: '#facc15', marginTop: 8 }}>
+            Game starts in <b>{countdown}</b> seconds…
+          </p>
+        )}
 
-        {/* PIN for private lobbies */}
         {selectedLobby.isPrivate && (
           <div style={{ marginTop: 10 }}>
             <span style={{ fontSize: 14 }}>PIN: </span>
             <input
-              type="password"
+              type='password'
               value={joinPin}
               maxLength={4}
-              onChange={e =>
-                setJoinPin(e.target.value.replace(/\D/g, ''))
-              }
+              onChange={e => setJoinPin(e.target.value.replace(/\D/g, ''))}
               style={{
                 padding: '4px 8px',
                 borderRadius: 6,
                 border: '1px solid #555',
                 background: '#050511',
                 color: '#fff',
-                width: 80,
+                width: 80
               }}
             />
           </div>
         )}
 
-        {/* ACTION BUTTONS ROW */}
         {!gameFinished && (
           <div
             style={{
               display: 'flex',
               flexWrap: 'wrap',
               gap: 8,
-              marginTop: 12,
+              marginTop: 12
             }}
           >
-            {/* JOIN / LEAVE – only for non-creator */}
             {!isMeCreator && (
               <button
                 onClick={() =>
@@ -1451,7 +1384,7 @@ const shortAddress =
                     ? leaveLobby(selectedLobby.id)
                     : joinLobby(
                         selectedLobby.id,
-                        selectedLobby.isPrivate ? joinPin : undefined,
+                        selectedLobby.isPrivate ? joinPin : undefined
                       )
                 }
                 style={{
@@ -1467,14 +1400,13 @@ const shortAddress =
                     : 'linear-gradient(135deg, #00d4ff 0%, #0074ff 60%, #4a00e0 100%)',
                   color: isMeInLobby ? '#111827' : '#fff',
                   boxShadow: '0 0 12px rgba(0,0,0,0.4)',
-                  textAlign: 'center',
+                  textAlign: 'center'
                 }}
               >
                 {isMeInLobby ? 'Leave lobby' : 'Join lobby'}
               </button>
             )}
 
-            {/* CANCEL LOBBY – only creator */}
             {isMeCreator && (
               <button
                 onClick={() => cancelLobby(selectedLobby.id)}
@@ -1490,7 +1422,7 @@ const shortAddress =
                     'linear-gradient(135deg, #ff4d6a 0%, #ff0000 40%, #8b0000 100%)',
                   color: '#fff',
                   boxShadow: '0 0 12px rgba(0,0,0,0.4)',
-                  textAlign: 'center',
+                  textAlign: 'center'
                 }}
               >
                 Cancel lobby
@@ -1499,7 +1431,6 @@ const shortAddress =
           </div>
         )}
 
-        {/* Game result in game page */}
         {selectedGameResult && (
           <div style={{ marginTop: 14 }}>
             <h4>Game Result:</h4>
@@ -1509,20 +1440,20 @@ const shortAddress =
             </p>
 
             <ul>
-  {selectedGameResult.players
-    .slice(
-      0,
-      rollRevealIndex == null
-        ? selectedGameResult.players.length
-        : rollRevealIndex + 1
-    )
-    .map((p, idx) => (
-      <li key={p.id}>
-        {idx === 0 ? '🎲 ' : ''}
-        {p.name}: rolled {p.roll}
-      </li>
-    ))}
-</ul>
+              {selectedGameResult.players
+                .slice(
+                  0,
+                  rollRevealIndex == null
+                    ? selectedGameResult.players.length
+                    : rollRevealIndex + 1
+                )
+                .map((p, idx) => (
+                  <li key={p.id}>
+                    {idx === 0 ? '🎲 ' : ''}
+                    {p.name}: rolled {p.roll}
+                  </li>
+                ))}
+            </ul>
 
             {Array.isArray((selectedGameResult as any).rounds) &&
               (selectedGameResult as any).rounds.length > 1 && (
@@ -1531,15 +1462,13 @@ const shortAddress =
                   {(selectedGameResult as any).rounds.map(
                     (
                       round: { id: string; name: string; roll: number }[],
-                      idx: number,
+                      idx: number
                     ) => (
                       <div key={idx}>
                         Round {idx + 1}:{' '}
-                        {round
-                          .map(r => `${r.name} (${r.roll})`)
-                          .join(', ')}
+                        {round.map(r => `${r.name} (${r.roll})`).join(', ')}
                       </div>
-                    ),
+                    )
                   )}
                 </div>
               )}
@@ -1548,7 +1477,8 @@ const shortAddress =
       </div>
     )
   }
-    // ---- lobbies page ----
+
+  // ---- lobbies page ----
 
   const renderLobbiesPage = () => (
     <>
@@ -1559,7 +1489,7 @@ const shortAddress =
           background: 'rgba(0,20,60,0.85)',
           borderRadius: 12,
           border: '1px solid rgba(0,120,255,0.2)',
-          boxShadow: '0 0 18px rgba(0,80,255,0.25)',
+          boxShadow: '0 0 18px rgba(0,80,255,0.25)'
         }}
       >
         <div
@@ -1567,7 +1497,7 @@ const shortAddress =
             display: 'flex',
             gap: 12,
             alignItems: 'center',
-            marginBottom: 8,
+            marginBottom: 8
           }}
         >
           <span style={{ fontSize: 13, color: '#ccc' }}>Lobby type:</span>
@@ -1576,11 +1506,11 @@ const shortAddress =
               display: 'flex',
               alignItems: 'center',
               gap: 4,
-              fontSize: 13,
+              fontSize: 13
             }}
           >
             <input
-              type="radio"
+              type='radio'
               checked={createMode === 'public'}
               onChange={() => setCreateMode('public')}
             />
@@ -1591,11 +1521,11 @@ const shortAddress =
               display: 'flex',
               alignItems: 'center',
               gap: 4,
-              fontSize: 13,
+              fontSize: 13
             }}
           >
             <input
-              type="radio"
+              type='radio'
               checked={createMode === 'private'}
               onChange={() => setCreateMode('private')}
             />
@@ -1607,7 +1537,7 @@ const shortAddress =
           <div style={{ marginBottom: 8 }}>
             <span style={{ fontSize: 13 }}>PIN (4 digits): </span>
             <input
-              type="password"
+              type='password'
               value={createPin}
               maxLength={4}
               onChange={e =>
@@ -1619,12 +1549,12 @@ const shortAddress =
                 border: '1px solid #555',
                 background: '#050511',
                 color: '#fff',
-                width: 80,
+                width: 80
               }}
             />
           </div>
         )}
-        {/* Lobby size: 2 or 4 players */}
+
         <div style={{ marginBottom: 8 }}>
           <span style={{ fontSize: 13, marginRight: 8 }}>Lobby size:</span>
           <label
@@ -1633,11 +1563,11 @@ const shortAddress =
               alignItems: 'center',
               gap: 4,
               fontSize: 13,
-              marginRight: 10,
+              marginRight: 10
             }}
           >
             <input
-              type="radio"
+              type='radio'
               checked={newLobbySize === 2}
               onChange={() => setNewLobbySize(2)}
             />
@@ -1648,24 +1578,24 @@ const shortAddress =
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4,
-              fontSize: 13,
+              fontSize: 13
             }}
           >
             <input
-              type="radio"
+              type='radio'
               checked={newLobbySize === 4}
               onChange={() => setNewLobbySize(4)}
             />
             4 players
           </label>
         </div>
-        {/* Bet amount for new lobby */}
+
         <div style={{ marginBottom: 8 }}>
           <span style={{ fontSize: 13 }}>Bet amount (TON): </span>
           <input
-            type="number"
+            type='number'
             step={0.1}
-            placeholder="0.1 eg"
+            placeholder='0.1 eg'
             value={newLobbyBet === 0 ? '' : newLobbyBet}
             onChange={e => {
               const v = e.target.value
@@ -1681,7 +1611,7 @@ const shortAddress =
               border: '1px solid #555',
               background: '#050511',
               color: '#fff',
-              width: 100,
+              width: 100
             }}
           />
         </div>
@@ -1698,7 +1628,7 @@ const shortAddress =
             cursor: 'pointer',
             fontWeight: 700,
             fontSize: 14,
-            boxShadow: '0 0 14px rgba(255,0,128,0.8)',
+            boxShadow: '0 0 14px rgba(255,0,128,0.8)'
           }}
         >
           Create Lobby
@@ -1714,7 +1644,7 @@ const shortAddress =
             border: '1px solid rgba(255,255,255,0.14)',
             borderRadius: 999,
             cursor: 'pointer',
-            fontSize: 13,
+            fontSize: 13
           }}
         >
           Refresh now
@@ -1735,7 +1665,7 @@ const shortAddress =
               'linear-gradient(135deg, rgba(0,30,80,0.9), rgba(0,15,40,0.95))',
             borderRadius: 10,
             border: '1px solid rgba(0,120,255,0.25)',
-            boxShadow: '0 0 14px rgba(0,80,255,0.4)',
+            boxShadow: '0 0 14px rgba(0,80,255,0.4)'
           }}
         >
           <h3 style={{ marginBottom: 4 }}>
@@ -1750,7 +1680,7 @@ const shortAddress =
                   borderRadius: 999,
                   marginLeft: 6,
                   color: '#111',
-                  fontWeight: 600,
+                  fontWeight: 600
                 }}
               >
                 Private
@@ -1762,9 +1692,9 @@ const shortAddress =
             Creator: {lobby.creatorName || 'not set yet (no players)'}
           </p>
           <p style={{ fontSize: 13, color: '#ccc' }}>
-  Players: {lobby.players.length}
-  {lobby.maxPlayers ? ` / ${lobby.maxPlayers}` : ''}
-</p>
+            Players: {lobby.players.length}
+            {lobby.maxPlayers ? ` / ${lobby.maxPlayers}` : ''}
+          </p>
           <p style={{ fontSize: 13, color: '#ccc' }}>
             Bet: {(lobby.betAmount ?? 1).toFixed(2)} TON
           </p>
@@ -1781,7 +1711,7 @@ const shortAddress =
 
               {currentUser && (() => {
                 const me = lobby.gameResult!.players.find(
-                  p => p.id === currentUser.id,
+                  p => p.id === currentUser.id
                 )
                 if (!me) return null
                 const didWin =
@@ -1790,7 +1720,7 @@ const shortAddress =
                   <div
                     style={{
                       marginTop: 2,
-                      color: didWin ? '#22c55e' : '#f97316',
+                      color: didWin ? '#22c55e' : '#f97316'
                     }}
                   >
                     You {didWin ? 'won' : 'lost'} with roll {me.roll}
@@ -1816,7 +1746,7 @@ const shortAddress =
               marginTop: 8,
               fontSize: 13,
               fontWeight: 600,
-              boxShadow: '0 0 12px rgba(0,116,255,0.8)',
+              boxShadow: '0 0 12px rgba(0,116,255,0.8)'
             }}
           >
             {lobby.status === 'finished' ? 'View result' : 'Open Lobby'}
@@ -1825,41 +1755,41 @@ const shortAddress =
       ))}
     </>
   )
+
   // ---- banner info: GLOBAL wins from all finished lobbies ----
-const finishedLobbies = lobbies.filter(
-  l =>
-    l.status === 'finished' &&
-    l.gameResult &&
-    Array.isArray(l.gameResult.players) &&
-    l.gameResult.players.length > 1
-);
+  const finishedLobbies = lobbies.filter(
+    l =>
+      l.status === 'finished' &&
+      l.gameResult &&
+      Array.isArray(l.gameResult.players) &&
+      l.gameResult.players.length > 1
+  )
 
-// last finished lobby = last win
-const lastFinishedLobby =
-  finishedLobbies.length > 0
-    ? finishedLobbies[finishedLobbies.length - 1]
-    : null;
+  const lastFinishedLobby =
+    finishedLobbies.length > 0
+      ? finishedLobbies[finishedLobbies.length - 1]
+      : null
 
-const lastGlobalWin = lastFinishedLobby
-  ? {
-      winnerName: lastFinishedLobby.gameResult!.winnerName,
-      amount:
-        (lastFinishedLobby.betAmount ?? 1) *
-        (lastFinishedLobby.gameResult!.players.length - 1),
+  const lastGlobalWin = lastFinishedLobby
+    ? {
+        winnerName: lastFinishedLobby.gameResult!.winnerName,
+        amount:
+          (lastFinishedLobby.betAmount ?? 1) *
+          (lastFinishedLobby.gameResult!.players.length - 1)
+      }
+    : null
+
+  const biggestGlobalWin = finishedLobbies.reduce<
+    { winnerName: string; amount: number } | null
+  >((max, lobby) => {
+    const gr = lobby.gameResult!
+    const amount = (lobby.betAmount ?? 1) * (gr.players.length - 1)
+    if (!max || amount > max.amount) {
+      return { winnerName: gr.winnerName, amount }
     }
-  : null;
+    return max
+  }, null)
 
-// biggest win across all finished lobbies
-const biggestGlobalWin = finishedLobbies.reduce<
-  { winnerName: string; amount: number } | null
->((max, lobby) => {
-  const gr = lobby.gameResult!;
-  const amount = (lobby.betAmount ?? 1) * (gr.players.length - 1);
-  if (!max || amount > max.amount) {
-    return { winnerName: gr.winnerName, amount };
-  }
-  return max;
-}, null);
   // ---- main frame ----
 
   return (
@@ -1874,16 +1804,15 @@ const biggestGlobalWin = finishedLobbies.reduce<
         color: '#fff',
         padding: 16,
         paddingBottom: 100,
-        position: 'relative',
+        position: 'relative'
       }}
     >
-      {/* Top title */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          marginBottom: 10,
+          marginBottom: 10
         }}
       >
         <div
@@ -1892,70 +1821,67 @@ const biggestGlobalWin = finishedLobbies.reduce<
             fontWeight: 800,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
-            textShadow: '0 0 10px rgba(255,0,128,0.8)',
+            textShadow: '0 0 10px rgba(255,0,128,0.8)'
           }}
         >
           THE DICE 🎲
         </div>
       </div>
 
-        {/* Top banner: GLOBAL last win & biggest win */}
-{(lastGlobalWin || biggestGlobalWin) && (
-  <div
-    style={{
-      marginBottom: 14,
-      padding: 10,
-      borderRadius: 14,
-      background:
-        'linear-gradient(135deg, rgba(0,40,100,0.95), rgba(60,10,90,0.98))',
-      border: '1px solid rgba(255,255,255,0.12)',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 6,
-      boxShadow: '0 0 18px rgba(255,0,128,0.4)',
-      fontSize: 12,
-    }}
-  >
-    {lastGlobalWin && (
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <span style={{ opacity: 0.8 }}>Last win:</span>
-        <span>
-          🎉 <b>{lastGlobalWin.winnerName}</b> won{' '}
-          <b>{lastGlobalWin.amount.toFixed(2)} TON</b>
-        </span>
-      </div>
-    )}
+      {(lastGlobalWin || biggestGlobalWin) && (
+        <div
+          style={{
+            marginBottom: 14,
+            padding: 10,
+            borderRadius: 14,
+            background:
+              'linear-gradient(135deg, rgba(0,40,100,0.95), rgba(60,10,90,0.98))',
+            border: '1px solid rgba(255,255,255,0.12)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            boxShadow: '0 0 18px rgba(255,0,128,0.4)',
+            fontSize: 12
+          }}
+        >
+          {lastGlobalWin && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <span style={{ opacity: 0.8 }}>Last win:</span>
+              <span>
+                🎉 <b>{lastGlobalWin.winnerName}</b> won{' '}
+                <b>{lastGlobalWin.amount.toFixed(2)} TON</b>
+              </span>
+            </div>
+          )}
 
-    {biggestGlobalWin && (
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <span style={{ opacity: 0.8 }}>Biggest win:</span>
-        <span>
-          👑 <b>{biggestGlobalWin.winnerName}</b> won{' '}
-          <b>{biggestGlobalWin.amount.toFixed(2)} TON</b>
-        </span>
-      </div>
-    )}
-  </div>
-)}
+          {biggestGlobalWin && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <span style={{ opacity: 0.8 }}>Biggest win:</span>
+              <span>
+                👑 <b>{biggestGlobalWin.winnerName}</b> won{' '}
+                <b>{biggestGlobalWin.amount.toFixed(2)} TON</b>
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* Pages */}
       {currentPage === 'lobbies' && renderLobbiesPage()}
       {currentPage === 'profile' && renderProfilePage()}
       {currentPage === 'game' && renderGamePage()}
 
-      {/* Bottom toolbar */}
       <div
         style={{
           position: 'fixed',
@@ -1968,7 +1894,7 @@ const biggestGlobalWin = finishedLobbies.reduce<
           borderTop: '1px solid rgba(0,140,255,0.35)',
           display: 'flex',
           justifyContent: 'center',
-          zIndex: 20,
+          zIndex: 20
         }}
       >
         <div
@@ -1978,7 +1904,7 @@ const biggestGlobalWin = finishedLobbies.reduce<
             display: 'flex',
             gap: 8,
             padding: 4,
-            borderRadius: 999,
+            borderRadius: 999
           }}
         >
           <button
@@ -2001,7 +1927,7 @@ const biggestGlobalWin = finishedLobbies.reduce<
                 currentPage === 'lobbies'
                   ? '0 0 10px rgba(80,180,255,0.6)'
                   : 'none',
-              whiteSpace: 'nowrap',
+              whiteSpace: 'nowrap'
             }}
           >
             Lobbies
@@ -2027,7 +1953,7 @@ const biggestGlobalWin = finishedLobbies.reduce<
                 currentPage === 'game'
                   ? '0 0 10px rgba(80,180,255,0.6)'
                   : 'none',
-              whiteSpace: 'nowrap',
+              whiteSpace: 'nowrap'
             }}
           >
             Game
@@ -2053,7 +1979,7 @@ const biggestGlobalWin = finishedLobbies.reduce<
                 currentPage === 'profile'
                   ? '0 0 10px rgba(80,180,255,0.6)'
                   : 'none',
-              whiteSpace: 'nowrap',
+              whiteSpace: 'nowrap'
             }}
           >
             Profile
@@ -2061,7 +1987,6 @@ const biggestGlobalWin = finishedLobbies.reduce<
         </div>
       </div>
 
-      {/* Error overlay */}
       {errorMessage && (
         <div
           onClick={() => setErrorMessage(null)}
@@ -2073,7 +1998,7 @@ const biggestGlobalWin = finishedLobbies.reduce<
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 9999,
-            cursor: 'pointer',
+            cursor: 'pointer'
           }}
         >
           <div
@@ -2089,7 +2014,7 @@ const biggestGlobalWin = finishedLobbies.reduce<
               color: '#fff',
               fontSize: 15,
               fontWeight: 600,
-              letterSpacing: '0.5px',
+              letterSpacing: '0.5px'
             }}
           >
             {errorMessage}
