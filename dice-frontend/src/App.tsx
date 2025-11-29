@@ -179,31 +179,44 @@ function DiceApp() {
   }, [])
 
   // ---- backend: lobbies ----
-  const loadLobbies = () => {
-    fetch(`${API}/lobbies`)
-      .then(res => res.json())
-      .then((data: Lobby[]) => {
-        setLobbies(prev => {
-          return data.map(l => {
-            const prevLobby = prev.find(p => p.id === l.id)
+  
+const loadLobbies = () => {
+  fetch(`${API}/lobbies`)
+    .then(res => res.json())
+    .then((data: any[]) => {
+      setLobbies(prev => {
+        return data.map(raw => {
+          // normalize id to number
+          const id = Number(raw.id)
+          const l: Lobby = {
+            ...raw,
+            id, // always numeric on frontend
+          }
 
-            // name that comes from backend (if at some point you save it there)
-            const backendName = l.lobbyName || (l as any).name || ''
+          // find existing lobby by id (also normalize)
+          const prevLobby = prev.find(p => Number(p.id) === id)
 
-            // prefer the name we already had in state
-            const finalName = (prevLobby && prevLobby.lobbyName) || backendName
+          // try to read name from backend if present
+          const backendName =
+            (l as any).lobbyName ||
+            (l as any).name ||
+            ''
 
-            return {
-              ...l,
-              lobbyName: finalName
-            }
-          })
+          // prefer our previous name (set when creating),
+          // otherwise backendName, otherwise empty string
+          const finalName =
+            (prevLobby && prevLobby.lobbyName) || backendName
+
+          return {
+            ...l,
+            lobbyName: finalName
+          }
         })
-        setStatus('Loaded')
       })
-      .catch(() => setStatus('Cannot reach backend'))
-  }
-
+      setStatus('Loaded')
+    })
+    .catch(() => setStatus('Cannot reach backend'))
+}
   useEffect(() => {
     loadLobbies()
   }, [])
