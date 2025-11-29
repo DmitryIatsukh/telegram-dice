@@ -304,7 +304,7 @@ const [, setPlayerRollInfo] = useState<
   }, [lobbies])
 
     // apply game results to balance (5% rake on total pot) + sync wallet
-  useEffect(() => {
+  /*useEffect(() => {
     if (!currentUser) return
     if (!lobbies || lobbies.length === 0) return
 
@@ -400,7 +400,7 @@ const [, setPlayerRollInfo] = useState<
 
     setProcessedLobbyIds(Array.from(processedSet))
   }, [lobbies, currentUser, userBets, tonBalance, history, processedLobbyIds])
-
+*/
 
   // ---- lobby actions ----
 
