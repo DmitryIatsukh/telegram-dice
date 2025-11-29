@@ -297,94 +297,103 @@ const [, setPlayerRollInfo] = useState<
     })
   }, [lobbies])
 
-  // apply game results to balance (5% rake) + sync wallet
+    // apply game results to balance (5% rake on total pot) + sync wallet
   useEffect(() => {
-  if (!currentUser) return
-  if (!lobbies || lobbies.length === 0) return
+    if (!currentUser) return
+    if (!lobbies || lobbies.length === 0) return
 
-  let totalDelta = 0
-  const newHistory: HistoryItem[] = []
-  const processedSet = new Set(processedLobbyIds)
+    let totalDelta = 0
+    const newHistory: HistoryItem[] = []
+    const processedSet = new Set(processedLobbyIds)
 
-  for (const lobby of lobbies) {
-    if (lobby.status !== 'finished') continue
-    const gr = lobby.gameResult
-    if (!gr) continue
-    if (processedSet.has(lobby.id)) continue
+    for (const lobby of lobbies) {
+      if (lobby.status !== 'finished') continue
+      const gr = lobby.gameResult
+      if (!gr) continue
+      if (processedSet.has(lobby.id)) continue
 
-    const players = gr.players || []
-    if (!players.some(p => p.id === currentUser.id)) {
-      processedSet.add(lobby.id)
-      continue
-    }
-
-    const betBase =
-      userBets[lobby.id] ??
-      (typeof lobby.betAmount === 'number' ? lobby.betAmount : 0)
-
-    if (!betBase || betBase <= 0) {
-      processedSet.add(lobby.id)
-      continue
-    }
-
-    const nPlayers = players.length
-    const isWinner = gr.winnerId === currentUser.id
-    const totalPot = betBase * nPlayers
-    const rake = isWinner ? totalPot * 0.05 : 0
-    const grossWin = isWinner ? totalPot - betBase : 0
-    const netDelta = isWinner ? grossWin - rake : -betBase
-
-    totalDelta += netDelta
-
-    newHistory.push({
-      id: Date.now() + lobby.id + Math.random(),
-      type: 'bet',
-      amount: Math.abs(netDelta),
-      currency: 'TON',
-      result: isWinner ? 'win' : 'lose',
-      createdAt: new Date().toLocaleString(),
-      playerName: currentUser.name
-    })
-
-    processedSet.add(lobby.id)
-  }
-
-  if (totalDelta !== 0 || newHistory.length > 0) {
-    const updatedBalance = Math.max(0, tonBalance + totalDelta)
-    const updatedHistory = [...newHistory, ...history]
-
-    setTonBalance(updatedBalance)
-    setHistory(updatedHistory)
-
-    // clear held bets for finished lobbies we just processed
-    setHeldBets(prev => {
-      const copy = { ...prev }
-      processedSet.forEach(id => {
-        if (copy[id]) delete copy[id]
-      })
-      return copy
-    })
-
-    ;(async () => {
-      try {
-        await fetch(`${API_BASE}/api/wallet/sync`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            telegramId: currentUser.id,
-            username: currentUser.username || currentUser.name,
-            balance: updatedBalance,
-            history: updatedHistory
-          })
-        })
-      } catch (e) {
-        console.log('wallet sync error', e)
+      const players = gr.players || []
+      if (!players.some(p => p.id === currentUser.id)) {
+        processedSet.add(lobby.id)
+        continue
       }
-    })()
-  }
 
-  setProcessedLobbyIds(Array.from(processedSet))
-}, [lobbies, currentUser, userBets, tonBalance, history, processedLobbyIds])
+      // base bet we assume per player in this lobby
+      const betBase =
+        (typeof lobby.betAmount === 'number' ? lobby.betAmount : undefined) ??
+        userBets[lobby.id] ??
+        0
+
+      if (!betBase || betBase <= 0) {
+        processedSet.add(lobby.id)
+        continue
+      }
+
+      const nPlayers = players.length
+      const isWinner = gr.winnerId === currentUser.id
+
+      let netDelta = 0
+      if (isWinner) {
+        // winner gets all opponents’ bets minus 5% rake on the *total* pot
+        const opponentsPot = betBase * (nPlayers - 1)
+        const rake = betBase * nPlayers * 0.05
+        netDelta = opponentsPot - rake
+      } else {
+        // loser simply loses his bet
+        netDelta = -betBase
+      }
+
+      totalDelta += netDelta
+
+      newHistory.push({
+        id: Date.now() + lobby.id + Math.random(),
+        type: 'bet',
+        amount: Math.abs(netDelta),
+        currency: 'TON',
+        result: isWinner ? 'win' : 'lose',
+        createdAt: new Date().toLocaleString(),
+        playerName: currentUser.name
+      })
+
+      processedSet.add(lobby.id)
+    }
+
+    if (totalDelta !== 0 || newHistory.length > 0) {
+      const updatedBalance = Math.max(0, tonBalance + totalDelta)
+      const updatedHistory = [...newHistory, ...history]
+
+      setTonBalance(updatedBalance)
+      setHistory(updatedHistory)
+
+      // clear held bets for processed lobbies
+      setHeldBets(prev => {
+        const copy = { ...prev }
+        processedSet.forEach(id => {
+          if (copy[id]) delete copy[id]
+        })
+        return copy
+      })
+
+      ;(async () => {
+        try {
+          await fetch(`${API_BASE}/api/wallet/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              telegramId: currentUser.id,
+              username: currentUser.username || currentUser.name,
+              balance: updatedBalance,
+              history: updatedHistory
+            })
+          })
+        } catch (e) {
+          console.log('wallet sync error', e)
+        }
+      })()
+    }
+
+    setProcessedLobbyIds(Array.from(processedSet))
+  }, [lobbies, currentUser, userBets, tonBalance, history, processedLobbyIds])
 
 
   // ---- lobby actions ----
@@ -1515,11 +1524,7 @@ useEffect(() => {
     const gameFinished = lobbyForGame.status === 'finished'
     const selectedGameResult = lobbyForGame.gameResult
 
-    const gameLobbyTitle = (
-      lobbyForGame.lobbyName ||
-      lobbyForGame.name ||
-      ''
-    ).trim()
+    const gameLobbyTitle = (lobbyForGame.lobbyName '').trim()
 
     const gameLabel = gameLobbyTitle
       ? `Lobby: ${gameLobbyTitle}`
@@ -1628,6 +1633,7 @@ useEffect(() => {
           >
             {!isMeCreator && (
               <button
+                disabled={visibleCountdown !== null}
                 onClick={() =>
                   isMeInLobby
                     ? leaveLobby(lobbyForGame.id)
@@ -1658,6 +1664,7 @@ useEffect(() => {
 
             {isMeCreator && (
               <button
+                disabled={visibleCountdown !== null}
                 onClick={() => cancelLobby(lobbyForGame.id)}
                 style={{
                   padding: '8px 16px',
@@ -1679,6 +1686,31 @@ useEffect(() => {
             )}
           </div>
         )}
+                {/* phase 1: invisible 10s pre-start → show only “Starting…” */}
+        {lobbyForGame.status === 'open' &&
+          preStartLobbyId === lobbyForGame.id &&
+          preStartSeconds > 0 && (
+            <p style={{ fontSize: 14, color: '#facc15', marginTop: 8 }}>
+              Starting…
+            </p>
+          )}
+
+        {/* phase 2: visible 3-2-1 before rolls */}
+        {visibleCountdown !== null &&
+          lobbyForGame.status !== 'finished' &&
+          myLobbyId === lobbyForGame.id && (
+            <p
+              style={{
+                fontSize: 28,
+                fontWeight: 800,
+                marginTop: 12,
+                textAlign: 'center'
+              }}
+            >
+              {visibleCountdown > 0 ? visibleCountdown : ''}
+            </p>
+          )}
+
 
         {/* game result block (unchanged logic) */}
         {selectedGameResult && (
@@ -1861,7 +1893,7 @@ useEffect(() => {
       {visibleLobbies.length === 0 && <p>No lobbies match your search</p>}
 
       {visibleLobbies.map(lobby => {
-        const title = (lobby.lobbyName || lobby.name || '').trim()
+        const title = (lobby.lobbyName || '').trim()
         const label = title ? `Lobby: ${title}` : `Lobby: #${lobby.id}`
 
         return (
