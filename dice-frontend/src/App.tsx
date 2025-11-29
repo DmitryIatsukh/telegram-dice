@@ -353,83 +353,81 @@ function DiceApp() {
   // ---- lobby actions ----
 
   const createLobby = () => {
-    if (!currentUser) return
+  if (!currentUser) return
 
-    const cleaned = newLobbyBetInput.trim()
-    const numeric =
-      cleaned === '' ? 0 : Number(cleaned.replace(',', '.'))
-    const newLobbyBet = isNaN(numeric) ? 0 : numeric
+  // parse bet input ONCE
+  const cleaned = newLobbyBetInput.trim()
+  const numeric =
+    cleaned === '' ? 0 : Number(cleaned.replace(',', '.'))
+  const newLobbyBet = isNaN(numeric) ? 0 : numeric
 
-    const cleaned = newLobbyBetInput.trim()
-const numeric = cleaned === '' ? 0 : Number(cleaned.replace(',', '.'))
-const newLobbyBet = isNaN(numeric) ? 0 : numeric
-
-if (newLobbyBet <= 0) {
-  setErrorMessage('Enter bet amount first')
-  return
-}
-
-if (newLobbyBet < 0.1) {
-  setErrorMessage('Minimum bet is 0.1 TON')
-  return
-}
-
-if (newLobbyBet > availableBalance) {
-  setErrorMessage(
-    "You don't have enough available balance for this bet (some funds may be held in other lobbies)"
-  )
-  return
-}
-
-if (createMode === 'private' && !/^\d{4}$/.test(createPin)) {
-  setErrorMessage('Private lobby needs a 4-digit PIN')
-  return
-}
-
-const betToSend = newLobbyBet
-    fetch(`${API}/lobbies/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: currentUser.id,
-        name: currentUser.username || currentUser.name,
-lobbyName,  
-        isPrivate: createMode === 'private',
-        pin: createMode === 'private' ? createPin : undefined,
-        betAmount: betToSend,
-        maxPlayers: newLobbySize
-      })
-    })
-      .then(async res => {
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}))
-          console.log('createLobby error', res.status, err)
-          setErrorMessage(
-            err.error || `Error creating lobby (code ${res.status})`
-          )
-          return null
-        }
-        return res.json()
-      })
-      .then((lobby: Lobby | null) => {
-        if (!lobby) return
-
-        setLobbies(prev => [...prev, lobby])
-        setSelectedLobbyId(lobby.id)
-        setCreatePin('')
-        setCurrentPage('game')
-setIsCreateModalOpen(false) // NEW
-
-        if (currentUser) {
-          setTimeout(() => {
-            joinLobby(
-              lobby.id,
-              createMode === 'private' ? createPin : undefined
-            )
-          }, 150)
-        }
-      })
+  if (newLobbyBet <= 0) {
+    setErrorMessage('Enter bet amount first')
+    return
   }
+
+  if (newLobbyBet < 0.1) {
+    setErrorMessage('Minimum bet is 0.1 TON')
+    return
+  }
+
+  if (newLobbyBet > availableBalance) {
+    setErrorMessage(
+      "You don't have enough available balance for this bet (some funds may be held in other lobbies)"
+    )
+    return
+  }
+
+  if (createMode === 'private' && !/^\d{4}$/.test(createPin)) {
+    setErrorMessage('Private lobby needs a 4-digit PIN')
+    return
+  }
+
+  const betToSend = newLobbyBet
+
+  fetch(`${API}/lobbies/create`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      userId: currentUser.id,
+      name: currentUser.username || currentUser.name,
+      lobbyName,
+      isPrivate: createMode === 'private',
+      pin: createMode === 'private' ? createPin : undefined,
+      betAmount: betToSend,
+      maxPlayers: newLobbySize
+    })
+  })
+    .then(async res => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        console.log('createLobby error', res.status, err)
+        setErrorMessage(
+          err.error || `Error creating lobby (code ${res.status})`
+        )
+        return null
+      }
+      return res.json()
+    })
+    .then((lobby: Lobby | null) => {
+      if (!lobby) return
+
+      setLobbies(prev => [...prev, lobby])
+      setSelectedLobbyId(lobby.id)
+      setCreatePin('')
+      setCurrentPage('game')
+      setIsCreateModalOpen(false)
+
+      if (currentUser) {
+        setTimeout(() => {
+          joinLobby(
+            lobby.id,
+            createMode === 'private' ? createPin : undefined
+          )
+        }, 150)
+      }
+    })
+}
 
   const joinLobby = (id: number, pin?: string) => {
     if (!currentUser) return
