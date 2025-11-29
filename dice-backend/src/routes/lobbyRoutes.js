@@ -210,12 +210,10 @@ router.post('/:id/toggle-ready', (req, res) => {
   return res.json(lobby);
 });
 
-/**
- * POST /api/lobbies/:id/start  (creator only, with rerolls)
- */
+// POST /api/lobbies/:id/start  (creator only, all players auto-ready)
 router.post('/:id/start', (req, res) => {
   const id = Number(req.params.id);
-  const { userId } = req.body || {};
+  const { userId } = req.body;
 
   const lobby = lobbies.find(l => l.id === id);
   if (!lobby) {
@@ -226,44 +224,46 @@ router.post('/:id/start', (req, res) => {
     return res.status(403).json({ error: 'Only lobby creator can start game' });
   }
 
-  if (!lobby.creatorId || !lobby.creatorName) {
-    return res.status(400).json({ error: 'Creator not set' });
-  }
-
-  const creatorIsPlayer = {
-    id: lobby.creatorId,
-    name: lobby.creatorName,
-    isReady: true,
-  };
-
-  const nonCreatorPlayers = lobby.players.filter(
-    p => String(p.id) !== String(lobby.creatorId),
-  );
-
+  // Everyone in the game: creator + all joined players
   const readyPlayers = [
-    creatorIsPlayer,
-    ...nonCreatorPlayers.filter(p => p.isReady),
+    {
+      id: lobby.creatorId,
+      name: lobby.creatorName,
+    },
+    ...lobby.players
+      .filter(p => String(p.id) !== String(lobby.creatorId))
+      .map(p => ({ id: p.id, name: p.name })),
   ];
 
+  // Need at least 2 players
   if (readyPlayers.length < 2) {
     return res.status(400).json({
-      error: 'Need creator + at least 1 ready player to start',
+      error: 'Need at least 2 players (creator + someone else) to start',
     });
   }
 
   const bet = lobby.betAmount || 0.1;
+
+  // We keep a log of all rounds (for rerolls display)
   const rounds = [];
 
-  let contenders = readyPlayers.map(p => ({ id: p.id, name: p.name }));
+  // Contenders in current round: all ready players
+  let contenders = readyPlayers.map(p => ({
+    id: p.id,
+    name: p.name,
+  }));
+
   let finalWinner = null;
   let finalHighest = 0;
-  const finalRollsById = {};
+  const finalRollsById = {}; // id -> roll in the deciding round
 
   while (true) {
+    // Roll for each contender in this round
     contenders.forEach(p => {
       p.roll = rollDie();
     });
 
+    // Save this round for UI (id, name, roll)
     rounds.push(
       contenders.map(p => ({
         id: p.id,
@@ -276,20 +276,23 @@ router.post('/:id/start', (req, res) => {
     const highestPlayers = contenders.filter(p => p.roll === highest);
 
     if (highestPlayers.length === 1) {
+      // Unique winner found
       finalWinner = highestPlayers[0];
       finalHighest = highest;
       highestPlayers.forEach(p => {
-        finalRollsById[String(p.id)] = p.roll;
+        finalRollsById[p.id] = p.roll;
       });
       break;
     }
 
+    // Tie – next round with only the tied players
     contenders = highestPlayers.map(p => ({
       id: p.id,
       name: p.name,
     }));
   }
 
+  // Payout: winner gets all others' bets (we assume individual bet = lobby.betAmount)
   const n = readyPlayers.length;
   const winnerProfit = bet * (n - 1);
 
@@ -297,10 +300,12 @@ router.post('/:id/start', (req, res) => {
     if (String(p.id) === String(finalWinner.id)) {
       recordBetResult(p.id, p.name, winnerProfit, 'win');
     } else {
+      // losers lose their bet
       recordBetResult(p.id, p.name, bet, 'lose');
     }
   });
 
+  // Update lobby
   lobby.status = 'finished';
   lobby.gameResult = {
     winnerId: finalWinner.id,
@@ -317,7 +322,7 @@ router.post('/:id/start', (req, res) => {
     rounds,
   };
 
-  return res.json(lobby);
+  res.json(lobby);
 });
 
 module.exports = router;
