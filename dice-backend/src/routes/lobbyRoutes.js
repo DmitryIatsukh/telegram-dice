@@ -7,8 +7,9 @@ const { recordBetResult } = require('../walletStore');
 let lobbies = [];
 let nextLobbyId = 1;
 
-function rollDie() {
-  return 1 + Math.floor(Math.random() * 6);
+function rollDice() {
+  const r = Math.floor(Math.random() * 6) + 1
+  return r // 1..6 only
 }
 
 /**
@@ -260,7 +261,7 @@ router.post('/:id/start', (req, res) => {
   while (true) {
     // Roll for each contender in this round
     contenders.forEach(p => {
-      p.roll = rollDie();
+      p.roll = rollDice();
     });
 
     // Save this round for UI (id, name, roll)
@@ -272,8 +273,8 @@ router.post('/:id/start', (req, res) => {
       })),
     );
 
-    const highest = Math.max(...contenders.map(p => p.roll));
-    const highestPlayers = contenders.filter(p => p.roll === highest);
+    const highest = Math.max(...gameResult.players.map(p => p.roll))
+    const winners = gameResult.players.filter(p => p.roll === highest)
 
     if (highestPlayers.length === 1) {
       // Unique winner found
@@ -304,6 +305,30 @@ router.post('/:id/start', (req, res) => {
       recordBetResult(p.id, p.name, bet, 'lose');
     }
   });
+// example: after all rolls are done
+gameResult.players = gameResult.players.map(p => {
+  let roll = Number(p.roll)
+
+  if (!roll || roll < 1 || roll > 6) {
+    // fallback safety – reroll on the server if something was wrong
+    roll = rollDice()
+  }
+
+  return { ...p, roll }
+})
+
+// same idea for rounds history if you store it
+if (Array.isArray(gameResult.rounds)) {
+  gameResult.rounds = gameResult.rounds.map(round =>
+    round.map(r => {
+      let roll = Number(r.roll)
+      if (!roll || roll < 1 || roll > 6) {
+        roll = rollDice()
+      }
+      return { ...r, roll }
+    })
+  )
+}
 
   // Update lobby
   lobby.status = 'finished';
