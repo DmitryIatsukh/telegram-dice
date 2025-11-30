@@ -797,59 +797,66 @@ const loadLobbies = () => {
   }
 }
   const handleWithdraw = async () => {
-    if (!currentUser) {
-      setErrorMessage('Telegram user not detected.')
-      return
-    }
-
-    if (!withdrawAmount || Number(withdrawAmount) <= 0) {
-      setErrorMessage('Enter withdraw amount first.')
-      return
-    }
-
-    const amountNumber = Number(withdrawAmount)
-
-    if (amountNumber > availableBalance) {
-      setErrorMessage(
-        `You can withdraw at most ${availableBalance.toFixed(
-          2
-        )} TON (the rest is held in active lobbies).`
-      )
-      return
-    }
-
-    try {
-      setErrorMessage(null)
-      setIsWithdrawing(true)
-
-      const res = await fetch(`${API_BASE}/api/wallet/withdraw`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          telegramId: currentUser.id,
-          username: currentUser.username || currentUser.name,
-          amount: amountNumber,
-          walletAddress: null
-        })
-      })
-
-      const data = await res.json()
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || 'Withdraw failed on server')
-      }
-
-      setTonBalance(data.balance || 0)
-      setHistory((data.history || []) as HistoryItem[])
-      setWithdrawAmount('')
-
-      setErrorMessage('Withdraw request created ✅. TON will be sent soon.')
-    } catch (err: any) {
-      console.error('Withdraw error:', err)
-      setErrorMessage(err?.message || 'Withdraw failed')
-    } finally {
-      setIsWithdrawing(false)
-    }
+  if (!currentUser) {
+    setErrorMessage('Telegram user not detected.')
+    return
   }
+
+  if (!wallet?.account?.address) {
+    setErrorMessage('Connect TON wallet first.')
+    return
+  }
+
+  if (!withdrawAmount || Number(withdrawAmount) <= 0) {
+    setErrorMessage('Enter withdraw amount first.')
+    return
+  }
+
+  const amountNumber = Number(withdrawAmount)
+
+  if (amountNumber > availableBalance) {
+    setErrorMessage(
+      `You can withdraw at most ${availableBalance.toFixed(
+        2
+      )} TON (the rest is held in active lobbies).`
+    )
+    return
+  }
+
+  const fromAddress = wallet.account.address  // ✅ TonConnect wallet address
+
+  try {
+    setErrorMessage(null)
+    setIsWithdrawing(true)
+
+    const res = await fetch(`${API_BASE}/api/wallet/withdraw`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegramId: currentUser.id,
+        username: currentUser.username || currentUser.name,
+        amount: amountNumber,
+        walletAddress: fromAddress       // ✅ send address to backend
+      })
+    })
+
+    const data = await res.json()
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || 'Withdraw failed on server')
+    }
+
+    setTonBalance(data.balance || 0)
+    setHistory((data.history || []) as HistoryItem[])
+    setWithdrawAmount('')
+
+    setErrorMessage('Withdraw sent ✅ TON is on its way.')
+  } catch (err: any) {
+    console.error('Withdraw error:', err)
+    setErrorMessage(err?.message || 'Withdraw failed')
+  } finally {
+    setIsWithdrawing(false)
+  }
+}
 
   // sync wallet to backend whenever balance/history change
   useEffect(() => {
