@@ -1363,7 +1363,7 @@ const loadLobbies = () => {
   }
 
   // ---- single game / lobby page ----
-  const renderGamePage = () => {
+    const renderGamePage = () => {
     const lobbyForGame: Lobby | null = selectedLobby
 
     if (!lobbyForGame) {
@@ -1379,22 +1379,27 @@ const loadLobbies = () => {
 
     const gameFinished = lobbyForGame.status === 'finished'
     const selectedGameResult = lobbyForGame.gameResult
-let countdownSeconds: number | null = null
-if (
-  lobbyForGame.status === 'countdown' &&
-  typeof lobbyForGame.autoStartAt === 'number'
-) {
-  countdownSeconds = Math.max(
-    0,
-    Math.ceil((lobbyForGame.autoStartAt - Date.now()) / 1000)
-  )
-}
+
+    // server-driven countdown (from backend autoStartAt)
+    let countdownSeconds: number | null = null
+    if (
+      lobbyForGame.status === 'countdown' &&
+      typeof lobbyForGame.autoStartAt === 'number'
+    ) {
+      countdownSeconds = Math.max(
+        0,
+        Math.ceil((lobbyForGame.autoStartAt - Date.now()) / 1000)
+      )
+    }
+
     const gameLobbyTitle = (lobbyForGame.lobbyName || '').trim()
     const gameLabel = gameLobbyTitle
       ? `Lobby: ${gameLobbyTitle}`
       : `Lobby: #${lobbyForGame.id}`
 
     const isMyLobby = myLobbyId === lobbyForGame.id
+    const isActionLocked =
+      lobbyForGame.status === 'countdown' || lobbyForGame.status === 'rolling'
 
     return (
       <div
@@ -1499,7 +1504,7 @@ if (
           >
             {!isMeCreator && (
               <button
-                disabled={visibleCountdown !== null}
+                disabled={isActionLocked}
                 onClick={() =>
                   isMeInLobby
                     ? leaveLobby(lobbyForGame.id)
@@ -1513,7 +1518,7 @@ if (
                   minWidth: 120,
                   borderRadius: 999,
                   border: 'none',
-                  cursor: 'pointer',
+                  cursor: isActionLocked ? 'not-allowed' : 'pointer',
                   fontSize: 13,
                   fontWeight: 600,
                   background: isMeInLobby
@@ -1521,7 +1526,8 @@ if (
                     : 'linear-gradient(135deg, #00d4ff 0%, #0074ff 60%, #4a00e0 100%)',
                   color: isMeInLobby ? '#111827' : '#fff',
                   boxShadow: '0 0 12px rgba(0,0,0,0.4)',
-                  textAlign: 'center'
+                  textAlign: 'center',
+                  opacity: isActionLocked ? 0.6 : 1
                 }}
               >
                 {isMeInLobby ? 'Leave lobby' : 'Join lobby'}
@@ -1530,21 +1536,22 @@ if (
 
             {isMeCreator && (
               <button
-                disabled={visibleCountdown !== null}
+                disabled={isActionLocked}
                 onClick={() => cancelLobby(lobbyForGame.id)}
                 style={{
                   padding: '8px 16px',
                   minWidth: 120,
                   borderRadius: 999,
                   border: 'none',
-                  cursor: 'pointer',
+                  cursor: isActionLocked ? 'not-allowed' : 'pointer',
                   fontSize: 13,
                   fontWeight: 600,
                   background:
                     'linear-gradient(135deg, #ff4d6a 0%, #ff0000 40%, #8b0000 100%)',
                   color: '#fff',
                   boxShadow: '0 0 12px rgba(0,0,0,0.4)',
-                  textAlign: 'center'
+                  textAlign: 'center',
+                  opacity: isActionLocked ? 0.6 : 1
                 }}
               >
                 Cancel lobby
@@ -1553,69 +1560,58 @@ if (
           </div>
         )}
 
-
-        {/* phase 2: visible 3-2-1 before rolls */}
-        {visibleCountdown !== null &&
-          lobbyForGame.status !== 'finished' &&
-          myLobbyId === lobbyForGame.id && (
+        {/* server-driven countdown */}
+        {countdownSeconds !== null &&
+          lobbyForGame.status === 'countdown' &&
+          isMyLobby && (
             <p
               style={{
-                fontSize: 28,
-                fontWeight: 800,
-                marginTop: 12,
-                textAlign: 'center'
+                fontSize: 18,
+                fontWeight: 700,
+                marginTop: 10,
+                textAlign: 'center',
+                color: '#facc15'
               }}
             >
-              {visibleCountdown > 0 ? visibleCountdown : ''}
+              Game starts in {countdownSeconds}s
             </p>
           )}
-{/* server-driven countdown */}
-{countdownSeconds !== null && lobbyForGame.status === 'countdown' && (
-  <p
-    style={{
-      fontSize: 18,
-      fontWeight: 700,
-      marginTop: 10,
-      textAlign: 'center',
-      color: '#facc15'
-    }}
-  >
-    Game starts in {countdownSeconds}s
-  </p>
-)}
 
-{lobbyForGame.status === 'rolling' && (
-  <p
-    style={{
-      fontSize: 16,
-      fontWeight: 600,
-      marginTop: 10,
-      textAlign: 'center',
-      color: '#a5b4fc'
-    }}
-  >
-    Rolling the dice…
-  </p>
-)}
+        {lobbyForGame.status === 'rolling' && (
+          <p
+            style={{
+              fontSize: 16,
+              fontWeight: 600,
+              marginTop: 10,
+              textAlign: 'center',
+              color: '#a5b4fc'
+            }}
+          >
+            Rolling the dice…
+          </p>
+        )}
 
         {/* game result / rolling block */}
         {selectedGameResult && (
-  <div style={{ marginTop: 14 }}>
-    <h4>Game Result:</h4>
-    <p>
-      Winner: {selectedGameResult.winnerName} (roll{' '}
-      {selectedGameResult.highest})
-    </p>
+          <div style={{ marginTop: 14 }}>
+            <h4>Game Result:</h4>
+            <p>
+              Winner: {selectedGameResult.winnerName} (roll{' '}
+              {selectedGameResult.highest})
+            </p>
 
-    <ul>
-      {selectedGameResult.players.map(player => (
-        <li key={player.id}>
-          {player.name}: rolled {normalizeRoll(player.roll)}
-        </li>
-      ))}
-    </ul>
-  </div>
-)}
+            <ul>
+              {selectedGameResult.players.map(player => (
+                <li key={player.id}>
+                  {player.name}: rolled {normalizeRoll(player.roll)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   // ---- FILTERS for lobbies ----
   const isSearchEmpty =
