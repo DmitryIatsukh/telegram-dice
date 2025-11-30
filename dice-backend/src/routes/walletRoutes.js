@@ -71,23 +71,23 @@ async function findMatchingDepositTx(fromAddress, amountNano, maxAgeSec, usedHas
 
   const txs = await fetchAppWalletTxs()
 
-  for (const tx of txs) {
+    for (const tx of txs) {
     const utime = tx.utime || tx.now || 0
     if (utime < minTime) continue
 
-    const hash = tx.hash || (tx.transaction_id && tx.transaction_id.hash)
+    const hash = tx.hash || tx.transaction_id?.hash
     if (!hash || usedHashes.has(hash)) continue
 
-    const inMsg = tx.in_msg || tx.in_msg_msg
+    const inMsg = tx.in_msg || tx.in_msg_msg || tx.in_message
     if (!inMsg) continue
 
     const src = inMsg.source || inMsg.src || ''
     const dst = inMsg.destination || inMsg.dst || ''
     const valueStr = String(inMsg.value || inMsg.amount || '0')
 
-    if (!src || !dst) continue
+    // We only care that MONEY ARRIVED TO APP_WALLET
+    if (!dst) continue
     if (dst !== APP_WALLET) continue
-    if (src !== fromAddress) continue
 
     let valueNano
     try {
@@ -96,7 +96,15 @@ async function findMatchingDepositTx(fromAddress, amountNano, maxAgeSec, usedHas
       continue
     }
 
+    // Amount must be at least what user typed
     if (valueNano >= amountNano) {
+      console.log('MATCHED DEPOSIT TX', {
+        hash,
+        utime,
+        valueNano: valueNano.toString(),
+        src,
+        dst
+      })
       return { hash, utime, valueNano }
     }
   }
