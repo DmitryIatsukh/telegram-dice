@@ -1,34 +1,17 @@
-// walletRoutes.ts (or similar)
-
 import express from 'express'
 import fetch from 'node-fetch'
 
 const router = express.Router()
 
-const APP_WALLET = process.env.APP_WALLET as string // same as in frontend
+const APP_WALLET = process.env.APP_WALLET || '' // same as in frontend
 const TONAPI_KEY = process.env.TONAPI_KEY || ''
 
-type HistoryItem = {
-  id: number
-  type: 'bet' | 'deposit' | 'withdraw'
-  amount: number
-  currency: 'TON'
-  result?: 'win' | 'lose'
-  createdAt: string
-  playerName?: string
-  txHash?: string
-}
+// In-memory "DB" of wallets
+// key: telegramId -> { telegramId, username, balance, history[] }
+const wallets = {}
 
-type WalletState = {
-  telegramId: string
-  username: string
-  balance: number
-  history: HistoryItem[]
-}
-
-const wallets: Record<string, WalletState> = {}
-
-function getWallet(telegramId: string, username?: string): WalletState {
+// Get or create wallet
+function getWallet(telegramId, username) {
   if (!wallets[telegramId]) {
     wallets[telegramId] = {
       telegramId,
@@ -46,7 +29,7 @@ function getWallet(telegramId: string, username?: string): WalletState {
 
 async function fetchAppWalletTxs() {
   const url = `https://tonapi.io/v2/blockchain/accounts/${APP_WALLET}/transactions?limit=50`
-  const headers: any = {}
+  const headers = {}
   if (TONAPI_KEY) headers.Authorization = `Bearer ${TONAPI_KEY}`
 
   const res = await fetch(url, { headers })
@@ -57,43 +40,39 @@ async function fetchAppWalletTxs() {
   }
   const data = await res.json()
   // tonapi returns { transactions: [...] } or { items: [...] } depending on version
-  return (data.transactions || data.items || []) as any[]
+  return (data.transactions || data.items || [])
 }
 
 /**
  * Find an incoming tx FROM fromAddress TO APP_WALLET with >= amountNano,
  * not older than maxAgeSec, and not already used (by tx hash).
  */
-async function findMatchingDepositTx(
-  fromAddress: string,
-  amountNano: bigint,
-  maxAgeSec: number,
-  usedHashes: Set<string>
-) {
+async function findMatchingDepositTx(fromAddress, amountNano, maxAgeSec, usedHashes) {
   const now = Math.floor(Date.now() / 1000)
   const minTime = now - maxAgeSec
 
   const txs = await fetchAppWalletTxs()
 
   for (const tx of txs) {
-    const utime: number = tx.utime || tx.now || 0
+    const utime = tx.utime || tx.now || 0
     if (utime < minTime) continue
 
-    const hash: string = tx.hash || tx.transaction_id?.hash
+    const hash = tx.hash || (tx.transaction_id && tx.transaction_id.hash)
     if (!hash || usedHashes.has(hash)) continue
 
-    const inMsg = tx.in_msg || tx.in_msg || tx.in_msg_msg // API variants
+    // different tonapi versions name this differently; we try a couple
+    const inMsg = tx.in_msg || tx.in_msg_msg || tx.in_msg_value
     if (!inMsg) continue
 
-    const src: string = inMsg.source || inMsg.src || ''
-    const dst: string = inMsg.destination || inMsg.dst || ''
-    const valueStr: string = String(inMsg.value || inMsg.amount || '0')
+    const src = inMsg.source || inMsg.src || ''
+    const dst = inMsg.destination || inMsg.dst || ''
+    const valueStr = String(inMsg.value || inMsg.amount || '0')
 
     if (!src || !dst) continue
     if (dst !== APP_WALLET) continue
     if (src !== fromAddress) continue
 
-    let valueNano: bigint
+    let valueNano
     try {
       valueNano = BigInt(valueStr)
     } catch {
@@ -149,8 +128,8 @@ router.post('/deposit', express.json(), async (req, res) => {
     }
 
     const wallet = getWallet(telegramId, username)
-    const usedHashes = new Set<string>(
-      wallet.history.map(h => h.txHash).filter(Boolean) as string[]
+    const usedHashes = new Set(
+      wallet.history.map(h => h.txHash).filter(Boolean)
     )
 
     const targetNano = BigInt(Math.round(amountNumber * 1e9))
@@ -158,7 +137,7 @@ router.post('/deposit', express.json(), async (req, res) => {
     // wait up to ~30s (6 tries * 5s) for TON API to show tx
     const maxTries = 6
     const delayMs = 5000
-    let found: { hash: string; utime: number; valueNano: bigint } | null = null
+    let found = null
 
     for (let i = 0; i < maxTries; i++) {
       try {
@@ -190,7 +169,7 @@ router.post('/deposit', express.json(), async (req, res) => {
     // credit balance
     wallet.balance += amountNumber
 
-    const historyItem: HistoryItem = {
+    const historyItem = {
       id: Date.now(),
       type: 'deposit',
       amount: amountNumber,
@@ -215,6 +194,6 @@ router.post('/deposit', express.json(), async (req, res) => {
   }
 })
 
-// (your /withdraw route stays as you already have it)
+// your existing /withdraw route should also be here, unchanged
 
 export default router
