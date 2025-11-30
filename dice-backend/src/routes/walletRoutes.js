@@ -100,7 +100,7 @@ async function fetchAppWalletTxs() {
  * not older than maxAgeSec, and not already used (by tx hash).
  */
 async function findMatchingDepositTx(
-  fromAddress,          // currently ignored (we only care that some tx arrived)
+  fromAddress,          // currently unused
   amountNano,
   maxAgeSec,
   usedHashes
@@ -114,14 +114,11 @@ async function findMatchingDepositTx(
     const utime = tx.utime || tx.now || 0
     if (utime < minTime) continue
 
-    const hash = tx.hash || tx.transaction_id?.hash
+    const hash = tx.hash || (tx.transaction_id && tx.transaction_id.hash)
     if (!hash || usedHashes.has(hash)) continue
 
     const inMsg = tx.in_msg || tx.in_msg_msg || tx.in_message
     if (!inMsg) continue
-
-    const dst = inMsg.destination || inMsg.dst || ''
-    if (dst !== APP_WALLET) continue
 
     const valueStr = String(inMsg.value || inMsg.amount || '0')
 
@@ -132,6 +129,7 @@ async function findMatchingDepositTx(
       continue
     }
 
+    // ✅ Only require: recent, not used, and amount >= requested
     if (valueNano >= amountNano) {
       console.log('MATCHED DEPOSIT TX', {
         hash,
@@ -143,6 +141,7 @@ async function findMatchingDepositTx(
   }
 
   return null
+}
 }
 
 // -------- ROUTES --------
