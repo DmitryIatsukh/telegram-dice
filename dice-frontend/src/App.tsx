@@ -22,13 +22,24 @@ type GameResult = {
   winnerName: string
   highest: number
   players: { id: string; name: string; roll: number }[]
-  rounds?: { id: string; name: string; roll: number }[][]
 } | null
+
+type LobbyGame = {
+  round: number
+  p1Roll: number | null
+  p2Roll: number | null
+  revealP1: boolean
+  revealP2: boolean
+  step: 'idle' | 'p1' | 'p2' | 'done'
+  winnerTelegramId: string | null
+}
+
+type LobbyStatus = 'open' | 'countdown' | 'rolling' | 'finished'
 
 type Lobby = {
   id: number
   players: Player[]
-  status: 'open' | 'finished'
+  status: LobbyStatus
   creatorId: string | null
   creatorName: string | null
   isPrivate: boolean
@@ -37,6 +48,10 @@ type Lobby = {
   gameResult: GameResult
   name?: string
   lobbyName?: string
+
+  // new from backend:
+  autoStartAt?: number
+  game?: LobbyGame
 }
 
 type HistoryItem = {
@@ -93,18 +108,6 @@ function DiceApp() {
   const [createPin, setCreatePin] = useState('')
   const [joinPin, setJoinPin] = useState('')
 
-  // phase 1: invisible 10s pre-start (show "Starting..." only)
-  const [preStartLobbyId, setPreStartLobbyId] = useState<number | null>(null)
-  const [preStartSeconds, setPreStartSeconds] = useState<number>(0)
-
-  // phase 2: visible 3-2-1 before rolls
-  const [visibleCountdown, setVisibleCountdown] = useState<number | null>(null)
-
-  // rolling sequence state
-  const [rollingIndex, setRollingIndex] = useState<number | null>(null)
-  const [playerRollInfo, setPlayerRollInfo] = useState<
-    Record<string, { roll: number | null; round: number }>
-  >({})
 
   const [myLobbyId, setMyLobbyId] = useState<number | null>(null)
 
@@ -185,35 +188,91 @@ const loadLobbies = () => {
   fetch(`${API}/lobbies`)
     .then(res => res.json())
     .then((data: any[]) => {
-      setLobbies(prev => {
-        return data.map(raw => {
-          // normalize id to number
-          const id = Number(raw.id)
-          const l: Lobby = {
-            ...raw,
-            id, // always numeric on frontend
+      const mapped: Lobby[] = data.map(raw => {
+        const id = Number(raw.id)
+
+        const players: Player[] = (raw.players || []).map((p: any) => ({
+          id: String(p.telegramId || p.id),
+          name: p.username || p.name || 'Player',
+          isReady: false,
+          roll: null
+        }))
+
+        // creator: first player or explicit creatorId
+        const creatorId = raw.creatorId
+          ? String(raw.creatorId)
+          : players[0]?.id || null
+        const creatorName =
+          raw.creatorName ||
+          raw.players?.[0]?.username ||
+          raw.players?.[0]?.name ||
+          null
+
+        // build simple gameResult when finished
+        let gameResult: GameResult = null
+        if (
+          raw.status === 'finished' &&
+          raw.game &&
+          Array.isArray(raw.players) &&
+          raw.players.length === 2
+        ) {
+          const g = raw.game
+          const p1Raw = raw.players[0]
+          const p2Raw = raw.players[1]
+          const p1Id = String(p1Raw.telegramId || p1Raw.id)
+          const p2Id = String(p2Raw.telegramId || p2Raw.id)
+
+          const playersResult = [
+            {
+              id: p1Id,
+              name: p1Raw.username || p1Raw.name || 'Player 1',
+              roll: g.p1Roll ?? 0
+            },
+            {
+              id: p2Id,
+              name: p2Raw.username || p2Raw.name || 'Player 2',
+              roll: g.p2Roll ?? 0
+            }
+          ]
+
+          const winnerId = String(g.winnerTelegramId || '')
+          const winnerPlayer =
+            playersResult.find(p => p.id === winnerId) || playersResult[0]
+          const highest = Math.max(
+            g.p1Roll ?? 0,
+            g.p2Roll ?? 0
+          )
+
+          gameResult = {
+            winnerId,
+            winnerName: winnerPlayer.name,
+            highest,
+            players: playersResult
           }
+        }
 
-          // find existing lobby by id (also normalize)
-          const prevLobby = prev.find(p => Number(p.id) === id)
+        const backendName = raw.lobbyName || raw.name || ''
 
-          // try to read name from backend if present
-          const backendName =
-            (l as any).lobbyName ||
-            (l as any).name ||
-            ''
+        const lobby: Lobby = {
+          id,
+          players,
+          status: raw.status as LobbyStatus,
+          creatorId,
+          creatorName,
+          isPrivate: false,
+          betAmount: typeof raw.bet === 'number' ? raw.bet : 1,
+          maxPlayers: raw.maxPlayers || 2,
+          gameResult,
+          name: backendName,
+          lobbyName: backendName,
+          autoStartAt: raw.autoStartAt,
+          game: raw.game
+        }
 
-          // prefer our previous name (set when creating),
-          // otherwise backendName, otherwise empty string
-          const finalName =
-            (prevLobby && prevLobby.lobbyName) || backendName
-
-          return {
-            ...l,
-            lobbyName: finalName
-          }
-        })
+        return lobby
       })
+
+      setLobbies(mapped)
       setStatus('Loaded')
     })
     .catch(() => setStatus('Cannot reach backend'))
@@ -333,123 +392,7 @@ const loadLobbies = () => {
     setMyLobbyId(mine ? mine.id : null)
   }, [lobbies, currentUser])
 
-  // ---- PRE-START (phase 1) ----
-  useEffect(() => {
-    if (!currentUser) return
-
-    const myLobby =
-      myLobbyId != null ? lobbies.find(l => l.id === myLobbyId) || null : null
-
-    if (!myLobby || myLobby.status !== 'open') {
-      setPreStartLobbyId(null)
-      setPreStartSeconds(0)
-      return
-    }
-
-    const totalPlayers = myLobby.players.length
-    const minPlayers = 2
-
-    // not enough players -> cancel pre-start
-    if (totalPlayers < minPlayers) {
-      setPreStartLobbyId(null)
-      setPreStartSeconds(0)
-      return
-    }
-
-    // enough players and no pre-start running -> start 10s
-    if (preStartLobbyId !== myLobby.id) {
-      setPreStartLobbyId(myLobby.id)
-      setPreStartSeconds(10)
-      return
-    }
-  }, [lobbies, myLobbyId, currentUser, preStartLobbyId])
-
-  // pre-start countdown 10..0
-  useEffect(() => {
-    if (!preStartLobbyId || preStartSeconds <= 0) return
-
-    const timer = setTimeout(() => {
-      setPreStartSeconds(s => s - 1)
-    }, 1000)
-
-    return () => clearTimeout(timer)
-  }, [preStartLobbyId, preStartSeconds])
-
-  // when pre-start finishes -> start game + visible countdown
-  useEffect(() => {
-    if (!preStartLobbyId || preStartSeconds > 0) return
-
-    const myLobby =
-      myLobbyId != null ? lobbies.find(l => l.id === myLobbyId) || null : null
-
-    if (!myLobby || myLobby.status !== 'open') {
-      setPreStartLobbyId(null)
-      return
-    }
-
-    // phase 1 finished -> call start and go into visible countdown
-    setPreStartLobbyId(null)
-
-    // start visible countdown 3..2..1
-    setVisibleCountdown(3)
-    startGame(myLobby.id)
-  }, [preStartLobbyId, preStartSeconds, myLobbyId, lobbies])
-
-  // visible 3-2-1 countdown
-  useEffect(() => {
-    if (visibleCountdown === null) return
-    if (visibleCountdown <= 0) return
-
-    const t = setTimeout(
-      () => setVisibleCountdown(c => (c === null ? null : c - 1)),
-      1000
-    )
-    return () => clearTimeout(t)
-  }, [visibleCountdown])
-
-  // when countdown finished and gameResult exists -> simulate rolling sequence
-  useEffect(() => {
-    if (visibleCountdown !== 0) return
-
-    const myLobby =
-      myLobbyId != null ? lobbies.find(l => l.id === myLobbyId) || null : null
-
-    if (!myLobby || !myLobby.gameResult) return
-
-    const players = myLobby.gameResult.players
-    if (!players || players.length === 0) return
-
-    const initial: Record<string, { roll: number | null; round: number }> = {}
-    players.forEach(p => {
-      initial[p.id] = { roll: null, round: 1 }
-    })
-    setPlayerRollInfo(initial)
-
-    let idx = 0
-    setRollingIndex(0)
-
-    const interval = setInterval(() => {
-      const player = players[idx]
-      const finalRoll = player.roll
-
-      setPlayerRollInfo(prev => ({
-        ...prev,
-        [player.id]: { roll: finalRoll, round: 1 }
-      }))
-
-      idx += 1
-      if (idx >= players.length) {
-        clearInterval(interval)
-        setRollingIndex(null)
-        setVisibleCountdown(null)
-      } else {
-        setRollingIndex(idx)
-      }
-    }, 4000) // 4s per player
-
-    return () => clearInterval(interval)
-  }, [visibleCountdown, myLobbyId, lobbies])
-
+ 
   // ---- lobby actions ----
 
   const createLobby = () => {
@@ -623,31 +566,6 @@ const loadLobbies = () => {
             ...prev,
             [lobbyJoined.id]: bet
           }))
-        }
-      })
-  }
-
-  const startGame = (id: number) => {
-    if (!currentUser) return
-    fetch(`${API}/lobbies/${id}/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: currentUser.id })
-    })
-      .then(async res => {
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}))
-          setErrorMessage(err.error || 'Cannot start game')
-          return null
-        }
-        return res.json()
-      })
-      .then((lobby: Lobby | null) => {
-        if (!lobby) return
-        setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
-
-        if (currentUser?.id) {
-          fetchWalletState(currentUser.id)
         }
       })
   }
