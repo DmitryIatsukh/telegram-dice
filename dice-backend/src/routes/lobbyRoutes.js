@@ -29,6 +29,7 @@ router.post('/create', (req, res) => {
     const {
       userId,
       name,
+      lobbyName,   // <── ADD THIS
       isPrivate,
       pin,
       betAmount,
@@ -46,12 +47,11 @@ router.post('/create', (req, res) => {
     const finalBet =
       typeof betAmount === 'number' && betAmount > 0 ? betAmount : 1;
 
-    // only 2 or 4 are allowed, default 4
     const finalMaxPlayers = maxPlayers === 2 ? 2 : 4;
 
     const newLobby = {
       id: nextLobbyId++,
-      players: [],                // creator will join from frontend
+      players: [],
       status: 'open',
       creatorId: null,
       creatorName: null,
@@ -60,6 +60,9 @@ router.post('/create', (req, res) => {
       betAmount: finalBet,
       maxPlayers: finalMaxPlayers,
       gameResult: null,
+
+      // 🚀 THE FIX
+      lobbyName: lobbyName || `Lobby #${nextLobbyId}`
     };
 
     lobbies.push(newLobby);
