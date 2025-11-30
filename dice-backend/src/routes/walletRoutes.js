@@ -1,15 +1,35 @@
-import express from 'express'
+// src/routes/walletRoutes.js
+
+const express = require('express')
 
 const router = express.Router()
 
 const APP_WALLET = process.env.APP_WALLET || '' // same as in frontend
 const TONAPI_KEY = process.env.TONAPI_KEY || ''
 
-// In-memory "DB" of wallets
-// key: telegramId -> { telegramId, username, balance, history[] }
-const wallets = {}
+// Types (for reference only, not real TS here)
+/*
+type HistoryItem = {
+  id: number
+  type: 'bet' | 'deposit' | 'withdraw'
+  amount: number
+  currency: 'TON'
+  result?: 'win' | 'lose'
+  createdAt: string
+  playerName?: string
+  txHash?: string
+}
 
-// Get or create wallet
+type WalletState = {
+  telegramId: string
+  username: string
+  balance: number
+  history: HistoryItem[]
+}
+*/
+
+const wallets = {}  // Record<string, WalletState>
+
 function getWallet(telegramId, username) {
   if (!wallets[telegramId]) {
     wallets[telegramId] = {
@@ -38,7 +58,6 @@ async function fetchAppWalletTxs() {
     throw new Error('Cannot fetch TON blockchain data')
   }
   const data = await res.json()
-  // tonapi returns { transactions: [...] } or { items: [...] } depending on version
   return (data.transactions || data.items || [])
 }
 
@@ -59,8 +78,7 @@ async function findMatchingDepositTx(fromAddress, amountNano, maxAgeSec, usedHas
     const hash = tx.hash || (tx.transaction_id && tx.transaction_id.hash)
     if (!hash || usedHashes.has(hash)) continue
 
-    // different tonapi versions name this differently; we try a couple
-    const inMsg = tx.in_msg || tx.in_msg_msg || tx.in_msg_value
+    const inMsg = tx.in_msg || tx.in_msg_msg
     if (!inMsg) continue
 
     const src = inMsg.source || inMsg.src || ''
@@ -133,7 +151,7 @@ router.post('/deposit', express.json(), async (req, res) => {
 
     const targetNano = BigInt(Math.round(amountNumber * 1e9))
 
-    // wait up to ~30s (6 tries * 5s) for TON API to show tx
+    // wait up to ~30s for TON API to show tx
     const maxTries = 6
     const delayMs = 5000
     let found = null
@@ -152,7 +170,6 @@ router.post('/deposit', express.json(), async (req, res) => {
 
       if (found) break
       if (i < maxTries - 1) {
-        // wait a bit and retry
         await new Promise(resolve => setTimeout(resolve, delayMs))
       }
     }
@@ -193,6 +210,6 @@ router.post('/deposit', express.json(), async (req, res) => {
   }
 })
 
-// your existing /withdraw route should also be here, unchanged
+// (keep your existing /withdraw route here if you had one)
 
-export default router
+module.exports = router
