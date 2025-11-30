@@ -494,7 +494,7 @@ const loadLobbies = () => {
       })
   }
 
-  const joinLobby = (id: number, pin?: string) => {
+    const joinLobby = (id: number, pin?: string) => {
     if (!currentUser) return
 
     // already in some lobby? disallow joining another
@@ -523,14 +523,15 @@ const loadLobbies = () => {
     }
 
     fetch(`${API}/lobbies/${id}/join`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    telegramId: currentUser.id,
-    username: currentUser.name,
-    avatarUrl: currentUser.avatarUrl
-  })
-})
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegramId: currentUser.id,
+        username: currentUser.name,
+        avatarUrl: currentUser.avatarUrl,
+        pin: pin || undefined        // ✅ use the parameter
+      })
+    })
       .then(async res => {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
