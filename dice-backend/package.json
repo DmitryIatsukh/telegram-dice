@@ -2,22 +2,22 @@
   "name": "dice-backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/index.js",
   "scripts": {
-  "start": "node src/index.js",
-  "dev": "nodemon src/index.js"
-},
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "tonweb": "^0.0.59",
+    "tonweb-mnemonic": "^1.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.11"
-      "tonweb": "^0.0.59",
-  "tonweb-mnemonic": "^1.0.0"
   }
 }
