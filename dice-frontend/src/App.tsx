@@ -104,7 +104,6 @@ function DiceApp() {
 
   // create / join
   const [createMode, setCreateMode] = useState<'public' | 'private'>('public')
-const [newLobbySize, setNewLobbySize] = useState<2>(2 as 2)
   const [createPin, setCreatePin] = useState('')
   const [joinPin, setJoinPin] = useState('')
 
@@ -121,7 +120,6 @@ const [newLobbySize, setNewLobbySize] = useState<2>(2 as 2)
   // search filters
   const [searchText, setSearchText] = useState('')
   const [searchBetMinInput, setSearchBetMinInput] = useState('')
-  const [searchSize, setSearchSize] = useState<'any' | 2 | 4>('any')
 
   // bet input as string
   const [newLobbyBetInput, setNewLobbyBetInput] = useState<string>('1')
@@ -183,20 +181,97 @@ const [newLobbySize, setNewLobbySize] = useState<2>(2 as 2)
   }, [])
 
   // ---- backend: lobbies ----
-  
+
+// 1) helper that converts raw backend lobby -> our Lobby type
+const mapRawLobby = (raw: any): Lobby => {
+  const id = Number(raw.id)
+
+  const players: Player[] = (raw.players || []).map((p: any) => ({
+    id: String(p.telegramId || p.id),
+    name: p.username || p.name || 'Player',
+    isReady: false,
+    roll: null
+  }))
+
+  const creatorId = raw.creatorId
+    ? String(raw.creatorId)
+    : players[0]?.id || null
+
+  const creatorName =
+    raw.creatorName ||
+    raw.players?.[0]?.username ||
+    raw.players?.[0]?.name ||
+    null
+
+  let gameResult: GameResult = null
+  if (
+    raw.status === 'finished' &&
+    raw.game &&
+    Array.isArray(raw.players) &&
+    raw.players.length === 2
+  ) {
+    const g = raw.game
+    const p1Raw = raw.players[0]
+    const p2Raw = raw.players[1]
+    const p1Id = String(p1Raw.telegramId || p1Raw.id)
+    const p2Id = String(p2Raw.telegramId || p2Raw.id)
+
+    const playersResult = [
+      {
+        id: p1Id,
+        name: p1Raw.username || p1Raw.name || 'Player 1',
+        roll: g.p1Roll ?? 0
+      },
+      {
+        id: p2Id,
+        name: p2Raw.username || p2Raw.name || 'Player 2',
+        roll: g.p2Roll ?? 0
+      }
+    ]
+
+    const winnerId = String(g.winnerTelegramId || '')
+    const winnerPlayer =
+      playersResult.find(p => p.id === winnerId) || playersResult[0]
+    const highest = Math.max(g.p1Roll ?? 0, g.p2Roll ?? 0)
+
+    gameResult = {
+      winnerId,
+      winnerName: winnerPlayer.name,
+      highest,
+      players: playersResult
+    }
+  }
+
+  const backendName = raw.lobbyName || raw.name || ''
+
+  return {
+    id,
+    players,
+    status: raw.status as LobbyStatus,
+    creatorId,
+    creatorName,
+    isPrivate: !!raw.isPrivate,
+    betAmount: typeof raw.bet === 'number' ? raw.bet : 1,
+    maxPlayers: raw.maxPlayers || 2,
+    gameResult,
+    name: backendName,
+    lobbyName: backendName,
+    autoStartAt: raw.autoStartAt,
+    game: raw.game
+  }
+}
+
+// 2) loadLobbies only uses the helper
 const loadLobbies = () => {
   fetch(`${API}/lobbies`)
     .then(res => res.json())
     .then((data: any[]) => {
-      const mapped: Lobby[] = data.map(raw => {
-        const id = Number(raw.id)
-
-        const players: Player[] = (raw.players || []).map((p: any) => ({
-          id: String(p.telegramId || p.id),
-          name: p.username || p.name || 'Player',
-          isReady: false,
-          roll: null
-        }))
+      const mapped: Lobby[] = data.map(mapRawLobby)
+      setLobbies(mapped)
+      setStatus('Loaded')
+    })
+    .catch(() => setStatus('Cannot reach backend'))
+}
 
         // creator: first player or explicit creatorId
         const creatorId = raw.creatorId
@@ -321,6 +396,15 @@ const loadLobbies = () => {
       fetchWalletState(currentUser.id)
     }
   }, [currentUser?.id])
+  useEffect(() => {
+    if (!currentUser?.id) return
+
+    const interval = setInterval(() => {
+      fetchWalletState(currentUser.id)
+    }, 4000) // every 4 seconds; tweak if needed
+
+    return () => clearInterval(interval)
+  }, [currentUser?.id])
 
   // detect user from Telegram WebApp
   useEffect(() => {
@@ -359,6 +443,7 @@ const loadLobbies = () => {
     }
   }, [])
 
+
   // Clean up holds when lobbies list changes
   useEffect(() => {
     setHeldBets(prev => {
@@ -395,7 +480,7 @@ const loadLobbies = () => {
  
   // ---- lobby actions ----
 
-  const createLobby = () => {
+    const createLobby = () => {
     if (!currentUser) return
 
     // do not allow creating second lobby if already in one
@@ -438,17 +523,23 @@ const loadLobbies = () => {
     }
 
     const betToSend = newLobbyBet
+    const finalNameToSend = lobbyName.trim() || undefined
 
     fetch(`${API}/lobbies`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    telegramId: currentUser.id,
-    username: currentUser.username || currentUser.name,
-    avatarUrl: currentUser.avatarUrl,
-    bet: betToSend
-  })
-})
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegramId: currentUser.id,
+        username: currentUser.username || currentUser.name,
+        avatarUrl: currentUser.avatarUrl,
+        bet: betToSend,
+        lobbyName: finalNameToSend,            // ✅ send name
+        name: finalNameToSend,
+        isPrivate: createMode === 'private',
+        pin: createMode === 'private' ? createPin : undefined,
+        maxPlayers: 2                           // ✅ always 2 players
+      })
+    })
       .then(async res => {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
@@ -460,41 +551,30 @@ const loadLobbies = () => {
         }
         return res.json()
       })
-      .then((lobby: Lobby | null) => {
-        if (!lobby) return
+      .then((raw: any | null) => {
+        if (!raw) return
 
-        const finalName =
-          lobbyName.trim() || lobby.lobbyName || `#${lobby.id}`
+        const newId = Number(raw.id)
 
-        const lobbyWithName: Lobby = {
-          ...lobby,
-          lobbyName: finalName
-        }
+        // hold my bet for this lobby
+        setHeldBets(prev => ({
+          ...prev,
+          [newId]: betToSend
+        }))
 
-        // ensure this lobby is in our state exactly once
-        setLobbies(prev => {
-          const filtered = prev.filter(l => l.id !== lobbyWithName.id)
-          return [...filtered, lobbyWithName]
-        })
-
-        setSelectedLobbyId(lobbyWithName.id)
-        setMyLobbyId(lobbyWithName.id)
+        setSelectedLobbyId(newId)
+        setMyLobbyId(newId)
         setCreatePin('')
         setLobbyName('')
-        setCurrentPage('game')
         setIsCreateModalOpen(false)
+        setCurrentPage('game')
 
-        // join my own lobby
-        setTimeout(() => {
-          joinLobby(
-            lobbyWithName.id,
-            createMode === 'private' ? createPin : undefined
-          )
-        }, 150)
+        // reload mapped lobbies from backend
+        loadLobbies()
       })
   }
 
-    const joinLobby = (id: number, pin?: string) => {
+      const joinLobby = (id: number, pin?: string) => {
     if (!currentUser) return
 
     // already in some lobby? disallow joining another
@@ -511,6 +591,13 @@ const loadLobbies = () => {
     }
 
     const lobby = lobbies.find(l => l.id === id)
+
+    // ✅ prevent 3rd player
+    if (lobby && lobby.players.length >= 2) {
+      setErrorMessage('Lobby is already full.')
+      return
+    }
+
     const lobbyBet = lobby?.betAmount ?? 0.1
 
     if (availableBalance < lobbyBet) {
@@ -529,7 +616,7 @@ const loadLobbies = () => {
         telegramId: currentUser.id,
         username: currentUser.name,
         avatarUrl: currentUser.avatarUrl,
-        pin: pin || undefined        // ✅ use the parameter
+        pin: pin || undefined          // ✅ use pin, fixes TS error
       })
     })
       .then(async res => {
@@ -540,81 +627,75 @@ const loadLobbies = () => {
         }
         return res.json()
       })
-      .then((lobbyJoined: Lobby | null) => {
-        if (!lobbyJoined) return
+      .then((raw: any | null) => {
+        if (!raw) return
 
-        setLobbies(prev =>
-          prev.map(l => (l.id === lobbyJoined.id ? lobbyJoined : l))
-        )
+        const idJoined = Number(raw.id)
+
         setJoinPin('')
-        setSelectedLobbyId(lobbyJoined.id)
-        setMyLobbyId(lobbyJoined.id)
+        setSelectedLobbyId(idJoined)
+        setMyLobbyId(idJoined)
         setCurrentPage('game')
 
         // hold my bet in this lobby
-        const meNow = lobbyJoined.players.find(p => p.id === currentUser.id)
-        if (meNow && !heldBets[lobbyJoined.id]) {
-          const bet =
-            typeof lobbyJoined.betAmount === 'number' &&
-            lobbyJoined.betAmount > 0
-              ? lobbyJoined.betAmount
-              : lobbyBet
+        setHeldBets(prev => ({
+          ...prev,
+          [idJoined]: lobbyBet
+        }))
 
-          setHeldBets(prev => ({
-            ...prev,
-            [lobbyJoined.id]: bet
-          }))
-        }
+        // reload latest state
+        loadLobbies()
       })
   }
 
-  const leaveLobby = (id: number) => {
+    const leaveLobby = (id: number) => {
     if (!currentUser) return
 
     fetch(`${API}/lobbies/${id}/leave`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ telegramId: currentUser.id })
-})
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telegramId: currentUser.id })
+    })
       .then(async res => {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
           setErrorMessage(err.error || 'Cannot leave lobby')
           return null
         }
-        return res.json()
+        return res.json().catch(() => null)
       })
-      .then((lobby: Lobby | null) => {
-        if (!lobby) return
-        setLobbies(prev => prev.map(l => (l.id === lobby.id ? lobby : l)))
+      .then(() => {
+        // free held bet
+        setHeldBets(prev => {
+          const copy = { ...prev }
+          delete copy[id]
+          return copy
+        })
 
-        const stillIn = lobby.players.some(p => p.id === currentUser.id)
-        if (!stillIn) {
-          setHeldBets(prev => {
-            const copy = { ...prev }
-            delete copy[id]
-            return copy
-          })
-          setMyLobbyId(null)
-        }
+        if (myLobbyId === id) setMyLobbyId(null)
+        if (selectedLobbyId === id) setSelectedLobbyId(null)
+
+        loadLobbies()
       })
   }
 
-  const cancelLobby = (id: number) => {
+    const cancelLobby = (id: number) => {
     if (!currentUser) return
 
     fetch(`${API}/lobbies/${id}/cancel`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ telegramId: currentUser.id })
-})
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telegramId: currentUser.id })
+    })
       .then(async res => {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
           setErrorMessage(err.error || 'Cannot cancel lobby')
-          return
+          return null
         }
-        setLobbies(prev => prev.filter(l => l.id !== id))
+        return res.json().catch(() => null)
+      })
+      .then(() => {
         setSelectedLobbyId(null)
         setMyLobbyId(prev => (prev === id ? null : prev))
 
@@ -623,6 +704,8 @@ const loadLobbies = () => {
           delete copy[id]
           return copy
         })
+
+        loadLobbies()
       })
   }
 
@@ -1615,9 +1698,8 @@ const loadLobbies = () => {
   }
 
   // ---- FILTERS for lobbies ----
-  const isSearchEmpty =
-    !searchText.trim() && !searchBetMinInput.trim() && searchSize === 'any'
-
+    const isSearchEmpty =
+    !searchText.trim() && !searchBetMinInput.trim()
   const matchesFilters = (lobby: Lobby) => {
     const q = searchText.trim().toLowerCase()
     if (q) {
@@ -1646,10 +1728,6 @@ const loadLobbies = () => {
       }
     }
 
-    if (searchSize !== 'any') {
-      const size = lobby.maxPlayers ?? lobby.players.length
-      if (size !== searchSize) return false
-    }
 
     return true
   }
@@ -2102,18 +2180,6 @@ const loadLobbies = () => {
               />
             </div>
 
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ marginBottom: 2 }}>Lobby size</div>
-              <label style={{ marginRight: 10, fontSize: 12 }}>
-                <input
-                  type='radio'
-                  checked={newLobbySize === 2}
-                  onChange={() => setNewLobbySize(2)}
-                  style={{ marginRight: 4 }}
-                />
-                2 players
-              </label>
-            </div>
 
             <div style={{ marginBottom: 8 }}>
               <div style={{ marginBottom: 2 }}>Visibility</div>
@@ -2286,27 +2352,6 @@ const loadLobbies = () => {
               />
             </div>
 
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ marginBottom: 2 }}>Lobby size</div>
-              <label style={{ marginRight: 10, fontSize: 12 }}>
-                <input
-                  type='radio'
-                  checked={searchSize === 'any'}
-                  onChange={() => setSearchSize('any')}
-                  style={{ marginRight: 4 }}
-                />
-                Any
-              </label>
-              <label style={{ marginRight: 10, fontSize: 12 }}>
-                <input
-                  type='radio'
-                  checked={searchSize === 2}
-                  onChange={() => setSearchSize(2)}
-                  style={{ marginRight: 4 }}
-                />
-                2 players
-              </label>
-            </div>
 
             <div
               style={{
@@ -2320,7 +2365,6 @@ const loadLobbies = () => {
                 onClick={() => {
                   setSearchText('')
                   setSearchBetMinInput('')
-                  setSearchSize('any')
                 }}
                 style={{
                   padding: '6px 10px',
