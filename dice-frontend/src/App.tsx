@@ -47,6 +47,7 @@ type HistoryItem = {
   result?: 'win' | 'lose'
   createdAt: string
   playerName?: string
+txHash?: string    
 }
 
 type Page = 'lobbies' | 'profile' | 'game'
@@ -727,62 +728,74 @@ const loadLobbies = () => {
 
   // TonConnect: deposit / withdraw
   const handleDeposit = async () => {
-    if (!currentUser || !tonConnectUI) {
-      setErrorMessage('Connect Telegram and TON wallet first.')
-      return
-    }
-
-    if (!depositAmount || Number(depositAmount) <= 0) {
-      setErrorMessage('Enter deposit amount first.')
-      return
-    }
-
-    const amountNumber = Number(depositAmount)
-
-    try {
-      setErrorMessage(null)
-      setIsDepositing(true)
-
-      const nanoAmount = BigInt(Math.floor(amountNumber * 1e9))
-
-      await tonConnectUI.sendTransaction({
-        validUntil: Math.floor(Date.now() / 1000) + 300,
-        messages: [
-          {
-            address: APP_WALLET,
-            amount: nanoAmount.toString()
-          }
-        ]
-      })
-
-      const res = await fetch(`${API_BASE}/api/wallet/deposit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          telegramId: currentUser.id,
-          username: currentUser.username || currentUser.name,
-          amount: amountNumber,
-          txHash: null
-        })
-      })
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || 'Deposit failed on server')
-      }
-
-      const data = await res.json()
-      setTonBalance(data.balance || 0)
-      setHistory((data.history || []) as HistoryItem[])
-      setDepositAmount('')
-    } catch (err: any) {
-      console.error('Deposit error:', err)
-      setErrorMessage(err?.message || 'Deposit failed')
-    } finally {
-      setIsDepositing(false)
-    }
+  if (!currentUser || !tonConnectUI) {
+    setErrorMessage('Connect Telegram and TON wallet first.')
+    return
   }
 
+  if (!wallet?.account?.address) {
+    setErrorMessage('TON wallet not connected.')
+    return
+  }
+
+  if (!depositAmount || Number(depositAmount) <= 0) {
+    setErrorMessage('Enter deposit amount first.')
+    return
+  }
+
+  const amountNumber = Number(depositAmount)
+  const fromAddress = wallet.account.address // the user wallet address (raw)
+
+  try {
+    setErrorMessage(null)
+    setIsDepositing(true)
+
+    // 1) Send tx via TonConnect
+    const nanoAmount = BigInt(Math.floor(amountNumber * 1e9))
+
+    await tonConnectUI.sendTransaction({
+      validUntil: Math.floor(Date.now() / 1000) + 300,
+      messages: [
+        {
+          address: APP_WALLET,
+          amount: nanoAmount.toString()
+        }
+      ]
+    })
+
+    // 2) Ask backend to VALIDATE on chain
+    //    Backend will look for a tx FROM fromAddress TO APP_WALLET with this amount
+    const res = await fetch(`${API_BASE}/api/wallet/deposit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegramId: currentUser.id,
+        username: currentUser.username || currentUser.name,
+        amount: amountNumber,
+        walletAddress: fromAddress
+      })
+    })
+
+    const data = await res.json()
+
+    if (!res.ok || !data.ok) {
+      throw new Error(
+        data.error ||
+          'Deposit transaction not found on-chain yet. Try again in a few seconds.'
+      )
+    }
+
+    // 3) Update local balance & history from backend
+    setTonBalance(data.balance || 0)
+    setHistory((data.history || []) as HistoryItem[])
+    setDepositAmount('')
+  } catch (err: any) {
+    console.error('Deposit error:', err)
+    setErrorMessage(err?.message || 'Deposit failed')
+  } finally {
+    setIsDepositing(false)
+  }
+}
   const handleWithdraw = async () => {
     if (!currentUser) {
       setErrorMessage('Telegram user not detected.')
