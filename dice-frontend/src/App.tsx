@@ -802,17 +802,17 @@ const loadLobbies = () => {
     return
   }
 
-  if (!wallet?.account?.address) {
-    setErrorMessage('Connect TON wallet first.')
+  if (!wallet || !wallet.account?.address) {
+    setErrorMessage('Connect your TON wallet first.')
     return
   }
 
-  if (!withdrawAmount || Number(withdrawAmount) <= 0) {
-    setErrorMessage('Enter withdraw amount first.')
-    return
-  }
-
+  // validate input BEFORE sending to backend
   const amountNumber = Number(withdrawAmount)
+  if (!withdrawAmount || !Number.isFinite(amountNumber) || amountNumber <= 0) {
+    setErrorMessage('Enter a valid withdraw amount.')
+    return
+  }
 
   if (amountNumber > availableBalance) {
     setErrorMessage(
@@ -822,8 +822,6 @@ const loadLobbies = () => {
     )
     return
   }
-
-  const fromAddress = wallet.account.address  // ✅ TonConnect wallet address
 
   try {
     setErrorMessage(null)
@@ -835,8 +833,8 @@ const loadLobbies = () => {
       body: JSON.stringify({
         telegramId: currentUser.id,
         username: currentUser.username || currentUser.name,
-        amount: amountNumber,
-        walletAddress: fromAddress       // ✅ send address to backend
+        amount: amountNumber,                     // already valid number
+        walletAddress: wallet.account.address     // <-- real address
       })
     })
 
@@ -848,8 +846,6 @@ const loadLobbies = () => {
     setTonBalance(data.balance || 0)
     setHistory((data.history || []) as HistoryItem[])
     setWithdrawAmount('')
-
-    setErrorMessage('Withdraw sent ✅ TON is on its way.')
   } catch (err: any) {
     console.error('Withdraw error:', err)
     setErrorMessage(err?.message || 'Withdraw failed')
