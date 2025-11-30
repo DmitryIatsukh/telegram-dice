@@ -104,7 +104,7 @@ function DiceApp() {
 
   // create / join
   const [createMode, setCreateMode] = useState<'public' | 'private'>('public')
-  const [newLobbySize, setNewLobbySize] = useState<2 | 4>(4)
+const [newLobbySize, setNewLobbySize] = useState<2>(2 as 2)
   const [createPin, setCreatePin] = useState('')
   const [joinPin, setJoinPin] = useState('')
 
@@ -439,19 +439,16 @@ const loadLobbies = () => {
 
     const betToSend = newLobbyBet
 
-    fetch(`${API}/lobbies/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: currentUser.id,
-        name: currentUser.username || currentUser.name,
-        lobbyName,
-        isPrivate: createMode === 'private',
-        pin: createMode === 'private' ? createPin : undefined,
-        betAmount: betToSend,
-        maxPlayers: newLobbySize
-      })
-    })
+    fetch(`${API}/lobbies`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    telegramId: currentUser.id,
+    username: currentUser.username || currentUser.name,
+    avatarUrl: currentUser.avatarUrl,
+    bet: betToSend
+  })
+})
       .then(async res => {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
@@ -526,14 +523,14 @@ const loadLobbies = () => {
     }
 
     fetch(`${API}/lobbies/${id}/join`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: currentUser.id,
-        name: currentUser.name,
-        pin
-      })
-    })
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    telegramId: currentUser.id,
+    username: currentUser.name,
+    avatarUrl: currentUser.avatarUrl
+  })
+})
       .then(async res => {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
@@ -574,10 +571,10 @@ const loadLobbies = () => {
     if (!currentUser) return
 
     fetch(`${API}/lobbies/${id}/leave`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: currentUser.id })
-    })
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ telegramId: currentUser.id })
+})
       .then(async res => {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
@@ -606,10 +603,10 @@ const loadLobbies = () => {
     if (!currentUser) return
 
     fetch(`${API}/lobbies/${id}/cancel`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: currentUser.id })
-    })
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ telegramId: currentUser.id })
+})
       .then(async res => {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
@@ -1382,14 +1379,22 @@ const loadLobbies = () => {
 
     const gameFinished = lobbyForGame.status === 'finished'
     const selectedGameResult = lobbyForGame.gameResult
+let countdownSeconds: number | null = null
+if (
+  lobbyForGame.status === 'countdown' &&
+  typeof lobbyForGame.autoStartAt === 'number'
+) {
+  countdownSeconds = Math.max(
+    0,
+    Math.ceil((lobbyForGame.autoStartAt - Date.now()) / 1000)
+  )
+}
     const gameLobbyTitle = (lobbyForGame.lobbyName || '').trim()
     const gameLabel = gameLobbyTitle
       ? `Lobby: ${gameLobbyTitle}`
       : `Lobby: #${lobbyForGame.id}`
 
     const isMyLobby = myLobbyId === lobbyForGame.id
-    const isRollingSequence =
-      isMyLobby && !!selectedGameResult && rollingIndex !== null
 
     return (
       <div
@@ -1548,14 +1553,6 @@ const loadLobbies = () => {
           </div>
         )}
 
-        {/* phase 1: invisible 10s pre-start → show only “Starting…” */}
-        {lobbyForGame.status === 'open' &&
-          preStartLobbyId === lobbyForGame.id &&
-          preStartSeconds > 0 && (
-            <p style={{ fontSize: 14, color: '#facc15', marginTop: 8 }}>
-              Starting…
-            </p>
-          )}
 
         {/* phase 2: visible 3-2-1 before rolls */}
         {visibleCountdown !== null &&
@@ -1572,69 +1569,53 @@ const loadLobbies = () => {
               {visibleCountdown > 0 ? visibleCountdown : ''}
             </p>
           )}
+{/* server-driven countdown */}
+{countdownSeconds !== null && lobbyForGame.status === 'countdown' && (
+  <p
+    style={{
+      fontSize: 18,
+      fontWeight: 700,
+      marginTop: 10,
+      textAlign: 'center',
+      color: '#facc15'
+    }}
+  >
+    Game starts in {countdownSeconds}s
+  </p>
+)}
+
+{lobbyForGame.status === 'rolling' && (
+  <p
+    style={{
+      fontSize: 16,
+      fontWeight: 600,
+      marginTop: 10,
+      textAlign: 'center',
+      color: '#a5b4fc'
+    }}
+  >
+    Rolling the dice…
+  </p>
+)}
 
         {/* game result / rolling block */}
         {selectedGameResult && (
-          <div style={{ marginTop: 14 }}>
-            <h4>Game Result:</h4>
-            <p>
-              Winner: {selectedGameResult.winnerName} (roll{' '}
-              {selectedGameResult.highest})
-            </p>
+  <div style={{ marginTop: 14 }}>
+    <h4>Game Result:</h4>
+    <p>
+      Winner: {selectedGameResult.winnerName} (roll{' '}
+      {selectedGameResult.highest})
+    </p>
 
-            {/* Animated reveal while rollingIndex is active */}
-            {isRollingSequence ? (
-              <ul>
-                {selectedGameResult.players.map(player => {
-                  const info = playerRollInfo[player.id]
-                  const displayedRoll =
-                    info && info.roll != null
-                      ? normalizeRoll(info.roll)
-                      : null
-
-                  return (
-                    <li key={player.id}>
-                      {player.name}:{' '}
-                      {displayedRoll === null
-                        ? 'rolling...'
-                        : `rolled ${displayedRoll}`}
-                    </li>
-                  )
-                })}
-              </ul>
-            ) : (
-              // Static final list when animation is done
-              <ul>
-                {selectedGameResult.players.map(player => (
-                  <li key={player.id}>
-                    {player.name}: rolled {normalizeRoll(player.roll)}
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {Array.isArray((selectedGameResult as any).rounds) &&
-              (selectedGameResult as any).rounds.length > 1 && (
-                <div style={{ marginTop: 8, fontSize: 12, color: '#ccc' }}>
-                  <div>Rounds (including rerolls):</div>
-                  {(selectedGameResult as any).rounds.map(
-                    (
-                      round: { id: string; name: string; roll: number }[],
-                      idx: number
-                    ) => (
-                      <div key={idx}>
-                        Round {idx + 1}:{' '}
-                        {round.map(r => `${r.name} (${r.roll})`).join(', ')}
-                      </div>
-                    )
-                  )}
-                </div>
-              )}
-          </div>
-        )}
-      </div>
-    )
-  }
+    <ul>
+      {selectedGameResult.players.map(player => (
+        <li key={player.id}>
+          {player.name}: rolled {normalizeRoll(player.roll)}
+        </li>
+      ))}
+    </ul>
+  </div>
+)}
 
   // ---- FILTERS for lobbies ----
   const isSearchEmpty =
@@ -2135,15 +2116,6 @@ const loadLobbies = () => {
                 />
                 2 players
               </label>
-              <label style={{ fontSize: 12 }}>
-                <input
-                  type='radio'
-                  checked={newLobbySize === 4}
-                  onChange={() => setNewLobbySize(4)}
-                  style={{ marginRight: 4 }}
-                />
-                4 players
-              </label>
             </div>
 
             <div style={{ marginBottom: 8 }}>
@@ -2336,15 +2308,6 @@ const loadLobbies = () => {
                   style={{ marginRight: 4 }}
                 />
                 2 players
-              </label>
-              <label style={{ fontSize: 12 }}>
-                <input
-                  type='radio'
-                  checked={searchSize === 4}
-                  onChange={() => setSearchSize(4)}
-                  style={{ marginRight: 4 }}
-                />
-                4 players
               </label>
             </div>
 
