@@ -1,341 +1,235 @@
-const express = require('express');
+// src/routes/lobbyRoutes.js
+const express = require("express");
 const router = express.Router();
 
-const { recordBetResult } = require('../walletStore');
-
-// In-memory lobbies
-let lobbies = [];
+const lobbies = {}; // id -> lobby
 let nextLobbyId = 1;
 
-function rollDice() {
-  const r = Math.floor(Math.random() * 6) + 1
-  return r // 1..6 only
+/*
+Lobby shape:
+
+{
+  id: number,
+  status: 'open' | 'countdown' | 'rolling' | 'finished',
+  bet: number,
+  creatorId: string,
+  players: [
+    { telegramId, username, avatarUrl }
+  ],
+  maxPlayers: 2,
+  autoStartAt?: number, // ms timestamp
+  game: {
+    round: number,
+    p1Roll: number | null,
+    p2Roll: number | null,
+    revealP1: boolean,
+    revealP2: boolean,
+    step: 'idle' | 'p1' | 'p2' | 'done',
+    nextStepAt: number | null, // ms timestamp
+    winnerTelegramId: string | null
+  }
+}
+*/
+
+function createEmptyGame() {
+  return {
+    round: 1,
+    p1Roll: null,
+    p2Roll: null,
+    revealP1: false,
+    revealP2: false,
+    step: "idle",
+    nextStepAt: null,
+    winnerTelegramId: null,
+  };
 }
 
-/**
- * GET /api/lobbies
- * (mounted as app.use('/api/lobbies', router))
- */
-router.get('/', (req, res) => {
-  res.json(lobbies);
-});
+function rollDie() {
+  return Math.floor(Math.random() * 6) + 1;
+}
 
-/**
- * POST /api/lobbies/create
- * body: { userId, name, isPrivate, pin, betAmount, maxPlayers }
- */
-router.post('/create', (req, res) => {
-  try {
-    const {
-      userId,
-      name,
-      lobbyName,   // <── ADD THIS
-      isPrivate,
-      pin,
-      betAmount,
-      maxPlayers,
-    } = req.body || {};
+// ------- GAME STATE MACHINE (server side) -------
 
-    if (!userId || !name) {
-      return res.status(400).json({ error: 'Missing userId or name' });
-    }
+function advanceGame(lobby) {
+  const now = Date.now();
 
-    if (isPrivate && (!pin || String(pin).length !== 4)) {
-      return res.status(400).json({ error: 'PIN must be 4 digits' });
-    }
-
-    const finalBet =
-      typeof betAmount === 'number' && betAmount > 0 ? betAmount : 1;
-
-    const finalMaxPlayers = maxPlayers === 2 ? 2 : 4;
-
-    const newLobby = {
-      id: nextLobbyId++,
-      players: [],
-      status: 'open',
-      creatorId: null,
-      creatorName: null,
-      isPrivate: !!isPrivate,
-      pin: isPrivate ? String(pin || '') : null,
-      betAmount: finalBet,
-      maxPlayers: finalMaxPlayers,
-      gameResult: null,
-
-      // 🚀 THE FIX
-      lobbyName: lobbyName || `Lobby #${nextLobbyId}`
-    };
-
-    lobbies.push(newLobby);
-    return res.json(newLobby);
-  } catch (err) {
-    console.error('create lobby error', err);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-/**
- * POST /api/lobbies/:id/join
- */
-router.post('/:id/join', (req, res) => {
-  const id = Number(req.params.id);
-  const { userId, name, pin } = req.body || {};
-
-  if (!userId || !name) {
-    return res.status(400).json({ error: 'userId and name are required' });
-  }
-
-  const lobby = lobbies.find(l => l.id === id);
-  if (!lobby) {
-    return res.status(404).json({ error: 'Lobby not found' });
-  }
-
-  if (lobby.status !== 'open') {
-    return res.status(400).json({ error: 'Lobby is not open' });
-  }
-
-  // lobby full?
-  const effectiveMaxPlayers = lobby.maxPlayers || 4;
-  if (lobby.players.length >= effectiveMaxPlayers) {
-    return res.status(400).json({ error: 'Lobby is full' });
-  }
-
-  if (lobby.isPrivate) {
-    if (!pin || String(pin) !== String(lobby.pin)) {
-      return res.status(400).json({ error: 'Wrong PIN' });
+  // 1) auto start after countdown
+  if (lobby.status === "countdown" && now >= lobby.autoStartAt) {
+    // if game not started yet, prepare rolls and start P1 step
+    if (lobby.game.step === "idle") {
+      lobby.game.p1Roll = rollDie();
+      lobby.game.p2Roll = rollDie();
+      lobby.game.revealP1 = false;
+      lobby.game.revealP2 = false;
+      lobby.game.step = "p1";
+      lobby.game.nextStepAt = now + 3000; // 3s invisible wait for P1 roll
+      lobby.status = "rolling";
     }
   }
 
-  const userIdStr = String(userId);
+  // 2) handle rolling steps
+  if (lobby.status === "rolling" && lobby.game.nextStepAt && now >= lobby.game.nextStepAt) {
+    if (lobby.game.step === "p1") {
+      // reveal player 1 roll
+      lobby.game.revealP1 = true;
+      lobby.game.step = "p2";
+      lobby.game.nextStepAt = now + 3000; // wait 3s for P2
+    } else if (lobby.game.step === "p2") {
+      // reveal player 2 roll
+      lobby.game.revealP2 = true;
 
-  // already joined? just return lobby
-  if (lobby.players.some(p => String(p.id) === userIdStr)) {
-    return res.json(lobby);
-  }
+      const p1 = lobby.game.p1Roll;
+      const p2 = lobby.game.p2Roll;
 
-  // if no creator yet, first joined user becomes creator
-  if (!lobby.creatorId) {
-    lobby.creatorId = userIdStr;
-    lobby.creatorName = name;
-  }
-
-  lobby.players.push({
-    id: userIdStr,
-    name,
-    isReady: false,
-    roll: null,
-  });
-
-  return res.json(lobby);
-});
-
-/**
- * POST /api/lobbies/:id/leave
- */
-router.post('/:id/leave', (req, res) => {
-  const id = Number(req.params.id);
-  const { userId } = req.body || {};
-
-  if (!userId) {
-    return res.status(400).json({ error: 'userId is required' });
-  }
-
-  const lobby = lobbies.find(l => l.id === id);
-  if (!lobby) {
-    return res.status(404).json({ error: 'Lobby not found' });
-  }
-
-  const userIdStr = String(userId);
-
-  // Creator cannot leave, only cancel
-  if (userIdStr === String(lobby.creatorId)) {
-    return res.status(400).json({ error: 'Creator cannot leave lobby' });
-  }
-
-  lobby.players = lobby.players.filter(p => String(p.id) !== userIdStr);
-
-  return res.json(lobby);
-});
-
-/**
- * POST /api/lobbies/:id/cancel  (creator only)
- */
-router.post('/:id/cancel', (req, res) => {
-  const id = Number(req.params.id);
-  const { userId } = req.body || {};
-
-  if (!userId) {
-    return res.status(400).json({ error: 'userId is required' });
-  }
-
-  const lobby = lobbies.find(l => l.id === id);
-  if (!lobby) {
-    return res.status(404).json({ error: 'Lobby not found' });
-  }
-
-  if (String(userId) !== String(lobby.creatorId)) {
-    return res.status(403).json({ error: 'Only lobby creator can cancel lobby' });
-  }
-
-  lobby.status = 'cancelled';
-  lobbies = lobbies.filter(l => l.id !== id);
-
-  return res.json({ ok: true });
-});
-
-/**
- * POST /api/lobbies/:id/toggle-ready
- */
-router.post('/:id/toggle-ready', (req, res) => {
-  const id = Number(req.params.id);
-  const { userId } = req.body || {};
-
-  if (!userId) {
-    return res.status(400).json({ error: 'userId is required' });
-  }
-
-  const lobby = lobbies.find(l => l.id === id);
-  if (!lobby) {
-    return res.status(404).json({ error: 'Lobby not found' });
-  }
-
-  const userIdStr = String(userId);
-
-  // Creator doesn’t ready up
-  if (userIdStr === String(lobby.creatorId)) {
-    return res.status(400).json({ error: 'Creator does not ready up' });
-  }
-
-  const player = lobby.players.find(p => String(p.id) === userIdStr);
-  if (!player) {
-    return res.status(400).json({ error: 'User not in lobby' });
-  }
-
-  player.isReady = !player.isReady;
-  return res.json(lobby);
-});
-
-// POST /api/lobbies/:id/start  (creator only, all players auto-ready)
-router.post('/:id/start', (req, res) => {
-  const id = Number(req.params.id);
-  const { userId } = req.body || {};
-
-  const lobby = lobbies.find(l => l.id === id);
-  if (!lobby) {
-    return res.status(404).json({ error: 'Lobby not found' });
-  }
-
-  if (String(userId) !== String(lobby.creatorId)) {
-    return res
-      .status(403)
-      .json({ error: 'Only lobby creator can start game' });
-  }
-
-  // Everyone in the game: creator + all joined players
-  const readyPlayers = [
-    {
-      id: String(lobby.creatorId),
-      name: lobby.creatorName,
-    },
-    ...lobby.players
-      .filter(p => String(p.id) !== String(lobby.creatorId))
-      .map(p => ({ id: String(p.id), name: p.name })),
-  ];
-
-  // Need at least 2 players
-  if (readyPlayers.length < 2) {
-    return res.status(400).json({
-      error: 'Need at least 2 players (creator + someone else) to start',
-    });
-  }
-
-  const bet = lobby.betAmount || 0.1;
-
-  // We keep a log of all rounds (for rerolls display)
-  const rounds = [];
-
-  // Contenders in current round: all ready players
-  let contenders = readyPlayers.map(p => ({
-    id: String(p.id),
-    name: p.name,
-  }));
-
-  let finalWinner = null;
-  let finalHighest = 0;
-
-  // each player's last roll in the **last round they played**
-  const finalRollsById = {}; // { [id]: number }
-
-  while (true) {
-    // Roll for each contender in this round
-    contenders.forEach(p => {
-      const r = rollDice(); // 1..6
-      p.roll = r;
-      // remember this as the latest roll for this player
-      finalRollsById[p.id] = r;
-    });
-
-    // Save this round for UI
-    rounds.push(
-      contenders.map(p => ({
-        id: p.id,
-        name: p.name,
-        roll: p.roll,
-      })),
-    );
-
-    // Find highest roll **among contenders in this round**
-    const highest = Math.max(...contenders.map(p => p.roll));
-    const highestPlayers = contenders.filter(p => p.roll === highest);
-
-    if (highestPlayers.length === 1) {
-      // unique winner found
-      finalWinner = highestPlayers[0];
-      finalHighest = highest;
-      break;
+      if (p1 === p2) {
+        // tie -> reroll, same logic again
+        lobby.game.round += 1;
+        lobby.game.p1Roll = rollDie();
+        lobby.game.p2Roll = rollDie();
+        lobby.game.revealP1 = false;
+        lobby.game.revealP2 = false;
+        lobby.game.step = "p1";
+        lobby.game.nextStepAt = now + 3000;
+        // status stays 'rolling'
+      } else {
+        // winner
+        const p1Player = lobby.players[0];
+        const p2Player = lobby.players[1];
+        lobby.game.winnerTelegramId = p1 > p2 ? p1Player.telegramId : p2Player.telegramId;
+        lobby.game.step = "done";
+        lobby.game.nextStepAt = null;
+        lobby.status = "finished";
+      }
     }
+  }
+}
 
-    // tie -> next round only with tied players (without .roll)
-    contenders = highestPlayers.map(p => ({
-      id: p.id,
-      name: p.name,
-    }));
+// Call this before returning lobby(s) to clients
+function touchLobby(lobby) {
+  // only progress logic when 2 players are inside
+  if (lobby.players.length === 2) {
+    advanceGame(lobby);
+  }
+}
+
+// ------- ROUTES --------
+
+// list lobbies (for search tab)
+router.get("/", (req, res) => {
+  const list = Object.values(lobbies);
+  list.forEach(touchLobby);
+  res.json(list);
+});
+
+// single lobby details (used by game screen)
+router.get("/:id", (req, res) => {
+  const lobby = lobbies[req.params.id];
+  if (!lobby) return res.status(404).json({ error: "Lobby not found" });
+
+  touchLobby(lobby);
+  res.json(lobby);
+});
+
+// create lobby – always 1vs1
+router.post("/", express.json(), (req, res) => {
+  const { telegramId, username, bet } = req.body || {};
+  if (!telegramId) {
+    return res.status(400).json({ error: "Missing telegramId" });
   }
 
-  // Payout:
-  // pot = bet * number of players
-  // rake = 5% of pot
-  // winner net profit = pot - rake - own bet
-  const n = readyPlayers.length;
-  const pot = bet * n;
-  const rake = pot * 0.05;
-  const winnerNetProfit = pot - rake - bet;
-
-  readyPlayers.forEach(p => {
-    if (String(p.id) === String(finalWinner.id)) {
-      // winner gets net PROFIT (extra over his own bet)
-      recordBetResult(p.id, p.name, winnerNetProfit, 'win');
-    } else {
-      // losers lose their bet
-      recordBetResult(p.id, p.name, bet, 'lose');
-    }
-  });
-
-  // Update lobby
-  lobby.status = 'finished';
-  lobby.gameResult = {
-    winnerId: finalWinner.id,
-    winnerName: finalWinner.name,
-    highest: finalHighest,
-    players: readyPlayers.map(p => ({
-      id: p.id,
-      name: p.name,
-      // use the last roll we have for that player; fallback to 1 (never 0)
-      roll: finalRollsById[String(p.id)] ?? 1,
-    })),
-    rounds,
+  const id = String(nextLobbyId++);
+  const lobby = {
+    id,
+    status: "open",
+    bet: Number(bet) || 1,
+    creatorId: telegramId,
+    players: [
+      {
+        telegramId,
+        username: username || "Player",
+        avatarUrl: req.body.avatarUrl || null,
+      },
+    ],
+    maxPlayers: 2,
+    autoStartAt: null,
+    game: createEmptyGame(),
   };
 
+  lobbies[id] = lobby;
   res.json(lobby);
+});
+
+// join lobby – once second player joins, start 10s countdown
+router.post("/:id/join", express.json(), (req, res) => {
+  const lobby = lobbies[req.params.id];
+  if (!lobby) return res.status(404).json({ error: "Lobby not found" });
+
+  const { telegramId, username, avatarUrl } = req.body || {};
+  if (!telegramId) {
+    return res.status(400).json({ error: "Missing telegramId" });
+  }
+
+  // already full (1vs1 only)
+  if (lobby.players.length >= 2) {
+    return res.status(400).json({ error: "Lobby is full" });
+  }
+
+  // don't add duplicate
+  if (!lobby.players.find((p) => p.telegramId === telegramId)) {
+    lobby.players.push({
+      telegramId,
+      username: username || "Player",
+      avatarUrl: avatarUrl || null,
+    });
+  }
+
+  // start 10s countdown when second player joins
+  if (lobby.players.length === 2 && lobby.status === "open") {
+    lobby.status = "countdown";
+    lobby.autoStartAt = Date.now() + 10_000; // 10 seconds
+    lobby.game = createEmptyGame(); // reset game state
+  }
+
+  touchLobby(lobby);
+  res.json(lobby);
+});
+
+// leave lobby (any player)
+router.post("/:id/leave", express.json(), (req, res) => {
+  const lobby = lobbies[req.params.id];
+  if (!lobby) return res.status(404).json({ error: "Lobby not found" });
+
+  const { telegramId } = req.body || {};
+  if (!telegramId) {
+    return res.status(400).json({ error: "Missing telegramId" });
+  }
+
+  lobby.players = lobby.players.filter((p) => p.telegramId !== telegramId);
+
+  // if someone left during countdown / rolling -> revert to open or delete
+  if (lobby.players.length === 0) {
+    delete lobbies[req.params.id];
+  } else {
+    lobby.status = "open";
+    lobby.autoStartAt = null;
+    lobby.game = createEmptyGame();
+  }
+
+  res.json({ ok: true });
+});
+
+// cancel lobby (creator)
+router.post("/:id/cancel", express.json(), (req, res) => {
+  const lobby = lobbies[req.params.id];
+  if (!lobby) return res.status(404).json({ error: "Lobby not found" });
+
+  const { telegramId } = req.body || {};
+  if (telegramId && telegramId !== lobby.creatorId) {
+    return res.status(403).json({ error: "Only creator can cancel lobby" });
+  }
+
+  delete lobbies[req.params.id];
+  res.json({ ok: true });
 });
 
 module.exports = router;
