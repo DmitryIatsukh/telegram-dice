@@ -65,13 +65,18 @@ async function fetchAppWalletTxs() {
  * Find an incoming tx FROM fromAddress TO APP_WALLET with >= amountNano,
  * not older than maxAgeSec, and not already used (by tx hash).
  */
-async function findMatchingDepositTx(fromAddress, amountNano, maxAgeSec, usedHashes) {
+async function findMatchingDepositTx(
+  fromAddress,          // still passed, but we ignore it for now
+  amountNano,
+  maxAgeSec,
+  usedHashes
+) {
   const now = Math.floor(Date.now() / 1000)
   const minTime = now - maxAgeSec
 
   const txs = await fetchAppWalletTxs()
 
-    for (const tx of txs) {
+  for (const tx of txs) {
     const utime = tx.utime || tx.now || 0
     if (utime < minTime) continue
 
@@ -81,13 +86,7 @@ async function findMatchingDepositTx(fromAddress, amountNano, maxAgeSec, usedHas
     const inMsg = tx.in_msg || tx.in_msg_msg || tx.in_message
     if (!inMsg) continue
 
-    const src = inMsg.source || inMsg.src || ''
-    const dst = inMsg.destination || inMsg.dst || ''
     const valueStr = String(inMsg.value || inMsg.amount || '0')
-
-    // We only care that MONEY ARRIVED TO APP_WALLET
-    if (!dst) continue
-    if (dst !== APP_WALLET) continue
 
     let valueNano
     try {
@@ -96,14 +95,12 @@ async function findMatchingDepositTx(fromAddress, amountNano, maxAgeSec, usedHas
       continue
     }
 
-    // Amount must be at least what user typed
+    // We only require: recent, not already used, amount >= requested.
     if (valueNano >= amountNano) {
       console.log('MATCHED DEPOSIT TX', {
         hash,
         utime,
-        valueNano: valueNano.toString(),
-        src,
-        dst
+        valueNano: valueNano.toString()
       })
       return { hash, utime, valueNano }
     }
