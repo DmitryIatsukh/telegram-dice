@@ -62,7 +62,7 @@ type HistoryItem = {
   result?: 'win' | 'lose'
   createdAt: string
   playerName?: string
-  txHash?: string
+txHash?: string    
 }
 
 type Page = 'lobbies' | 'profile' | 'game'
@@ -104,9 +104,10 @@ function DiceApp() {
 
   // create / join
   const [createMode, setCreateMode] = useState<'public' | 'private'>('public')
-  const [newLobbySize, setNewLobbySize] = useState<2>(2 as 2)
+const [newLobbySize, setNewLobbySize] = useState<2>(2 as 2)
   const [createPin, setCreatePin] = useState('')
   const [joinPin, setJoinPin] = useState('')
+
 
   const [myLobbyId, setMyLobbyId] = useState<number | null>(null)
 
@@ -182,97 +183,100 @@ function DiceApp() {
   }, [])
 
   // ---- backend: lobbies ----
-  const loadLobbies = () => {
-    fetch(`${API}/lobbies`)
-      .then(res => res.json())
-      .then((data: any[]) => {
-        const mapped: Lobby[] = data.map(raw => {
-          const id = Number(raw.id)
+  
+const loadLobbies = () => {
+  fetch(`${API}/lobbies`)
+    .then(res => res.json())
+    .then((data: any[]) => {
+      const mapped: Lobby[] = data.map(raw => {
+        const id = Number(raw.id)
 
-          const players: Player[] = (raw.players || []).map((p: any) => ({
-            id: String(p.telegramId || p.id),
-            name: p.username || p.name || 'Player',
-            isReady: false,
-            roll: null
-          }))
+        const players: Player[] = (raw.players || []).map((p: any) => ({
+          id: String(p.telegramId || p.id),
+          name: p.username || p.name || 'Player',
+          isReady: false,
+          roll: null
+        }))
 
-          // creator: first player or explicit creatorId
-          const creatorId = raw.creatorId
-            ? String(raw.creatorId)
-            : players[0]?.id || null
-          const creatorName =
-            raw.creatorName ||
-            raw.players?.[0]?.username ||
-            raw.players?.[0]?.name ||
-            null
+        // creator: first player or explicit creatorId
+        const creatorId = raw.creatorId
+          ? String(raw.creatorId)
+          : players[0]?.id || null
+        const creatorName =
+          raw.creatorName ||
+          raw.players?.[0]?.username ||
+          raw.players?.[0]?.name ||
+          null
 
-          // build simple gameResult when finished
-          let gameResult: GameResult = null
-          if (
-            raw.status === 'finished' &&
-            raw.game &&
-            Array.isArray(raw.players) &&
-            raw.players.length === 2
-          ) {
-            const g = raw.game
-            const p1Raw = raw.players[0]
-            const p2Raw = raw.players[1]
-            const p1Id = String(p1Raw.telegramId || p1Raw.id)
-            const p2Id = String(p2Raw.telegramId || p2Raw.id)
+        // build simple gameResult when finished
+        let gameResult: GameResult = null
+        if (
+          raw.status === 'finished' &&
+          raw.game &&
+          Array.isArray(raw.players) &&
+          raw.players.length === 2
+        ) {
+          const g = raw.game
+          const p1Raw = raw.players[0]
+          const p2Raw = raw.players[1]
+          const p1Id = String(p1Raw.telegramId || p1Raw.id)
+          const p2Id = String(p2Raw.telegramId || p2Raw.id)
 
-            const playersResult = [
-              {
-                id: p1Id,
-                name: p1Raw.username || p1Raw.name || 'Player 1',
-                roll: g.p1Roll ?? 0
-              },
-              {
-                id: p2Id,
-                name: p2Raw.username || p2Raw.name || 'Player 2',
-                roll: g.p2Roll ?? 0
-              }
-            ]
-
-            const winnerId = String(g.winnerTelegramId || '')
-            const winnerPlayer =
-              playersResult.find(p => p.id === winnerId) || playersResult[0]
-            const highest = Math.max(g.p1Roll ?? 0, g.p2Roll ?? 0)
-
-            gameResult = {
-              winnerId,
-              winnerName: winnerPlayer.name,
-              highest,
-              players: playersResult
+          const playersResult = [
+            {
+              id: p1Id,
+              name: p1Raw.username || p1Raw.name || 'Player 1',
+              roll: g.p1Roll ?? 0
+            },
+            {
+              id: p2Id,
+              name: p2Raw.username || p2Raw.name || 'Player 2',
+              roll: g.p2Roll ?? 0
             }
+          ]
+
+          const winnerId = String(g.winnerTelegramId || '')
+          const winnerPlayer =
+            playersResult.find(p => p.id === winnerId) || playersResult[0]
+          const highest = Math.max(
+            g.p1Roll ?? 0,
+            g.p2Roll ?? 0
+          )
+
+          gameResult = {
+            winnerId,
+            winnerName: winnerPlayer.name,
+            highest,
+            players: playersResult
           }
+        }
 
-          const backendName = raw.lobbyName || raw.name || ''
+        const backendName = raw.lobbyName || raw.name || ''
 
-          const lobby: Lobby = {
-            id,
-            players,
-            status: raw.status as LobbyStatus,
-            creatorId,
-            creatorName,
-            isPrivate: false,
-            betAmount: typeof raw.bet === 'number' ? raw.bet : 1,
-            maxPlayers: raw.maxPlayers || 2,
-            gameResult,
-            name: backendName,
-            lobbyName: backendName,
-            autoStartAt: raw.autoStartAt,
-            game: raw.game
-          }
+        const lobby: Lobby = {
+          id,
+          players,
+          status: raw.status as LobbyStatus,
+          creatorId,
+          creatorName,
+          isPrivate: false,
+          betAmount: typeof raw.bet === 'number' ? raw.bet : 1,
+          maxPlayers: raw.maxPlayers || 2,
+          gameResult,
+          name: backendName,
+          lobbyName: backendName,
+          autoStartAt: raw.autoStartAt,
+          game: raw.game
+        }
 
-          return lobby
-        })
-
-        setLobbies(mapped)
-        setStatus('Loaded')
+        return lobby
       })
-      .catch(() => setStatus('Cannot reach backend'))
-  }
 
+      setLobbies(mapped)
+      setStatus('Loaded')
+    })
+    .catch(() => setStatus('Cannot reach backend'))
+}
   useEffect(() => {
     loadLobbies()
   }, [])
@@ -388,7 +392,8 @@ function DiceApp() {
     setMyLobbyId(mine ? mine.id : null)
   }, [lobbies, currentUser])
 
-    // ---- lobby actions ----
+ 
+  // ---- lobby actions ----
 
   const createLobby = () => {
     if (!currentUser) return
@@ -435,15 +440,15 @@ function DiceApp() {
     const betToSend = newLobbyBet
 
     fetch(`${API}/lobbies`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        telegramId: currentUser.id,
-        username: currentUser.username || currentUser.name,
-        avatarUrl: currentUser.avatarUrl,
-        bet: betToSend
-      })
-    })
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    telegramId: currentUser.id,
+    username: currentUser.username || currentUser.name,
+    avatarUrl: currentUser.avatarUrl,
+    bet: betToSend
+  })
+})
       .then(async res => {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
@@ -458,7 +463,8 @@ function DiceApp() {
       .then((lobby: Lobby | null) => {
         if (!lobby) return
 
-        const finalName = lobbyName.trim() || lobby.lobbyName || `#${lobby.id}`
+        const finalName =
+          lobbyName.trim() || lobby.lobbyName || `#${lobby.id}`
 
         const lobbyWithName: Lobby = {
           ...lobby,
@@ -517,14 +523,14 @@ function DiceApp() {
     }
 
     fetch(`${API}/lobbies/${id}/join`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        telegramId: currentUser.id,
-        username: currentUser.name,
-        avatarUrl: currentUser.avatarUrl
-      })
-    })
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    telegramId: currentUser.id,
+    username: currentUser.name,
+    avatarUrl: currentUser.avatarUrl
+  })
+})
       .then(async res => {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
@@ -565,10 +571,10 @@ function DiceApp() {
     if (!currentUser) return
 
     fetch(`${API}/lobbies/${id}/leave`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ telegramId: currentUser.id })
-    })
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ telegramId: currentUser.id })
+})
       .then(async res => {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
@@ -597,10 +603,10 @@ function DiceApp() {
     if (!currentUser) return
 
     fetch(`${API}/lobbies/${id}/cancel`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ telegramId: currentUser.id })
-    })
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ telegramId: currentUser.id })
+})
       .then(async res => {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
@@ -637,88 +643,87 @@ function DiceApp() {
 
   // TonConnect: deposit / withdraw
   const handleDeposit = async () => {
-    if (!currentUser || !tonConnectUI) {
-      setErrorMessage('Connect Telegram and TON wallet first.')
-      return
-    }
-
-    if (!wallet?.account?.address) {
-      setErrorMessage('TON wallet not connected.')
-      return
-    }
-
-    if (!depositAmount || Number(depositAmount) <= 0) {
-      setErrorMessage('Enter deposit amount first.')
-      return
-    }
-
-    const amountNumber = Number(depositAmount)
-    const fromAddress = wallet.account.address // the user wallet address (raw)
-
-    try {
-      setErrorMessage(null)
-      setIsDepositing(true)
-
-      // 1) Send tx via TonConnect
-      const nanoAmount = BigInt(Math.floor(amountNumber * 1e9))
-
-      await tonConnectUI.sendTransaction({
-        validUntil: Math.floor(Date.now() / 1000) + 300,
-        messages: [
-          {
-            address: APP_WALLET,
-            amount: nanoAmount.toString()
-          }
-        ]
-      })
-
-      // 2) Ask backend to VALIDATE on chain
-      const res = await fetch(`${API_BASE}/api/wallet/deposit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          telegramId: currentUser.id,
-          username: currentUser.username || currentUser.name,
-          amount: amountNumber,
-          walletAddress: fromAddress
-        })
-      })
-
-      const data = await res.json()
-
-      if (!res.ok || !data.ok) {
-        throw new Error(
-          data.error ||
-            'Deposit transaction not found on-chain yet. Try again in a few seconds.'
-        )
-      }
-
-      // 3) Update local balance & history from backend
-      setTonBalance(data.balance || 0)
-      setHistory((data.history || []) as HistoryItem[])
-      setDepositAmount('')
-    } catch (err: any) {
-      console.error('Deposit error:', err)
-      setErrorMessage(err?.message || 'Deposit failed')
-    } finally {
-      setIsDepositing(false)
-    }
+  if (!currentUser || !tonConnectUI) {
+    setErrorMessage('Connect Telegram and TON wallet first.')
+    return
   }
 
+  if (!wallet?.account?.address) {
+    setErrorMessage('TON wallet not connected.')
+    return
+  }
+
+  if (!depositAmount || Number(depositAmount) <= 0) {
+    setErrorMessage('Enter deposit amount first.')
+    return
+  }
+
+  const amountNumber = Number(depositAmount)
+  const fromAddress = wallet.account.address // the user wallet address (raw)
+
+  try {
+    setErrorMessage(null)
+    setIsDepositing(true)
+
+    // 1) Send tx via TonConnect
+    const nanoAmount = BigInt(Math.floor(amountNumber * 1e9))
+
+    await tonConnectUI.sendTransaction({
+      validUntil: Math.floor(Date.now() / 1000) + 300,
+      messages: [
+        {
+          address: APP_WALLET,
+          amount: nanoAmount.toString()
+        }
+      ]
+    })
+
+    // 2) Ask backend to VALIDATE on chain
+    //    Backend will look for a tx FROM fromAddress TO APP_WALLET with this amount
+    const res = await fetch(`${API_BASE}/api/wallet/deposit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegramId: currentUser.id,
+        username: currentUser.username || currentUser.name,
+        amount: amountNumber,
+        walletAddress: fromAddress
+      })
+    })
+
+    const data = await res.json()
+
+    if (!res.ok || !data.ok) {
+      throw new Error(
+        data.error ||
+          'Deposit transaction not found on-chain yet. Try again in a few seconds.'
+      )
+    }
+
+    // 3) Update local balance & history from backend
+    setTonBalance(data.balance || 0)
+    setHistory((data.history || []) as HistoryItem[])
+    setDepositAmount('')
+  } catch (err: any) {
+    console.error('Deposit error:', err)
+    setErrorMessage(err?.message || 'Deposit failed')
+  } finally {
+    setIsDepositing(false)
+  }
+}
   const handleWithdraw = async () => {
-    if (!currentUser) {
-      setErrorMessage('Telegram user not detected.')
-      return
-    }
+  if (!currentUser) {
+    setErrorMessage('Telegram user not detected.')
+    return
+  }
 
-    if (!wallet || !wallet.account?.address) {
-      setErrorMessage('Connect your TON wallet first.')
-      return
-    }
+  if (!wallet || !wallet.account?.address) {
+    setErrorMessage('Connect your TON wallet first.')
+    return
+  }
 
-    // validate input BEFORE sending to backend
-      const amountNumber = Number(withdrawAmount)
-
+  // validate input BEFORE sending to backend
+  const amountNumber = Number(withdrawAmount)
   if (!withdrawAmount || !Number.isFinite(amountNumber) || amountNumber <= 0) {
     setErrorMessage('Enter a valid withdraw amount.')
     return
@@ -743,8 +748,8 @@ function DiceApp() {
       body: JSON.stringify({
         telegramId: currentUser.id,
         username: currentUser.username || currentUser.name,
-        amount: amountNumber,
-        walletAddress: wallet.account.address
+        amount: amountNumber,                     // already valid number
+        walletAddress: wallet.account.address     // <-- real address
       })
     })
 
@@ -1033,8 +1038,326 @@ function DiceApp() {
           </div>
         </div>
 
-        {/* balance + deposit/withdraw card */}
-        {/* ... you already have this part above; keep it as-is ... */}
+        <div
+          style={{
+            position: 'relative',
+            background:
+              'linear-gradient(135deg, rgba(0,25,70,0.92), rgba(0,18,60,0.97))',
+            borderRadius: 16,
+            padding: 16,
+            border: '1px solid rgba(0,150,255,0.25)',
+            marginBottom: 22,
+            boxShadow: '0 0 18px rgba(0,100,255,0.45)'
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 14
+            }}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700 }}>🎲 Dice Balance</div>
+            <div
+              style={{
+                fontSize: 11,
+                color: '#b197fc',
+                textTransform: 'uppercase',
+                letterSpacing: '0.12em'
+              }}
+            >
+              TON CASINO
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 12,
+              flexWrap: 'wrap'
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: '#b3b3ff',
+                  marginBottom: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}
+              >
+                <span
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: '50%',
+                    background:
+                      'radial-gradient(circle at 30% 30%, #40cfff 0%, #007bff 60%, #003366 100%)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 11,
+                    boxShadow: '0 0 8px rgba(64,207,255,0.7)'
+                  }}
+                >
+                  T
+                </span>
+                TON balance
+              </div>
+              <div
+                style={{
+                  fontSize: 26,
+                  fontWeight: 700,
+                  textShadow: '0 0 12px rgba(64,207,255,0.8)'
+                }}
+              >
+                {availableBalance.toFixed(2)}
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: '#9ca3af',
+                  marginTop: 2
+                }}
+              >
+                Total: {tonBalance.toFixed(2)} TON · Held: {totalHeld.toFixed(2)}{' '}
+                TON
+              </div>
+            </div>
+
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 12, marginBottom: 4, color: '#c7d2fe' }}>
+                  💰 Deposit (TonConnect)
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 6,
+                    flexWrap: 'wrap',
+                    alignItems: 'center'
+                  }}
+                >
+                  <input
+                    placeholder='Amount'
+                    value={depositAmount}
+                    onChange={e => setDepositAmount(e.target.value)}
+                    style={{
+                      flex: '1 1 130px',
+                      minWidth: 130,
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      border: '1px solid #555',
+                      background: '#050511',
+                      color: '#fff',
+                      fontSize: 12
+                    }}
+                  />
+                  <button
+                    onClick={handleDeposit}
+                    disabled={isDepositing}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: 999,
+                      border: 'none',
+                      background:
+                        'linear-gradient(135deg, #00d65c 0%, #25ff9a 50%, #eaffd0 100%)',
+                      color: '#0c1b16',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: isDepositing ? 'wait' : 'pointer',
+                      whiteSpace: 'nowrap',
+                      opacity: isDepositing ? 0.6 : 1,
+                      width: 'auto',
+                      textAlign: 'center'
+                    }}
+                  >
+                    {isDepositing ? 'Processing…' : '💸 Deposit'}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 12, marginBottom: 4, color: '#fed7aa' }}>
+                  🏧 Withdraw (internal for now)
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 6,
+                    flexWrap: 'wrap',
+                    alignItems: 'center'
+                  }}
+                >
+                  <input
+                    placeholder='Amount'
+                    value={withdrawAmount}
+                    onChange={e => setWithdrawAmount(e.target.value)}
+                    style={{
+                      flex: '1 1 130px',
+                      minWidth: 130,
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      border: '1px solid #555',
+                      background: '#050511',
+                      color: '#fff',
+                      fontSize: 12
+                    }}
+                  />
+                  <button
+                    onClick={handleWithdraw}
+                    disabled={isWithdrawing}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: 999,
+                      border: 'none',
+                      background:
+                        'linear-gradient(135deg, #f97316 0%, #fb7185 50%, #fee2e2 100%)',
+                      color: '#111827',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: isWithdrawing ? 'wait' : 'pointer',
+                      whiteSpace: 'nowrap',
+                      opacity: isWithdrawing ? 0.6 : 1,
+                      width: 'auto',
+                      textAlign: 'center'
+                    }}
+                  >
+                    {isWithdrawing ? 'Processing…' : '📤 Withdraw'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 6, fontSize: 10, color: '#9ca3af' }}>
+            Deposit sends real TON to app wallet via TonConnect. Withdraw is
+            internal until backend payout is implemented.
+          </div>
+        </div>
+
+        <div>
+          <div
+            style={{
+              fontSize: 16,
+              fontWeight: 700,
+              marginBottom: 10
+            }}
+          >
+            📜 Balance history
+          </div>
+          {history.length === 0 && (
+            <div style={{ fontSize: 14, color: '#888' }}>No history yet</div>
+          )}
+          <div
+            style={{
+              maxHeight: 260,
+              overflowY: 'auto',
+              paddingRight: 4
+            }}
+          >
+            {history.map(item => {
+              let label = ''
+              let color = '#fff'
+              let icon = '💰'
+              let sign = ''
+
+              if (item.type === 'deposit') {
+                sign = '+'
+                label = 'Deposit'
+                color = '#00ff9d'
+                icon = '💸'
+              } else if (item.type === 'withdraw') {
+                sign = '-'
+                label = 'Withdraw'
+                color = '#ffe66b'
+                icon = '📤'
+              } else if (item.type === 'bet') {
+                sign =
+                  item.result === 'win'
+                    ? '+'
+                    : item.result === 'lose'
+                    ? '-'
+                    : ''
+                label =
+                  item.result === 'win'
+                    ? 'Bet — Win'
+                    : item.result === 'lose'
+                    ? 'Bet — Lose'
+                    : 'Bet'
+                color =
+                  item.result === 'win'
+                    ? '#00ff9d'
+                    : item.result === 'lose'
+                    ? '#ff4d6a'
+                    : '#ffffff'
+                icon = item.result === 'win' ? '🎉' : '🎲'
+              }
+
+              return (
+                <div
+                  key={item.id}
+                  style={{
+                    background:
+                      'linear-gradient(135deg, rgba(0,25,60,0.9), rgba(0,15,40,0.95))',
+                    borderRadius: 10,
+                    padding: 10,
+                    border: '1px solid rgba(0,150,255,0.2)',
+                    marginBottom: 8,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    boxShadow: '0 0 12px rgba(0,100,255,0.35)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 8,
+                        background:
+                          item.type === 'bet'
+                                                        ? 'radial-gradient(circle at 30% 30%, #4dafff 0%, #005eff 60%, #00122b 100%)'
+                            : item.type === 'deposit'
+                            ? 'radial-gradient(circle at 30% 30%, #a8ff78 0%, #78ffd6 60%, #1b4332 100%)'
+                            : 'radial-gradient(circle at 30% 30%, #f6d365 0%, #fda085 60%, #4a1c40 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 16,
+                        boxShadow: '0 0 10px rgba(0,0,0,0.7)'
+                      }}
+                    >
+                      {icon}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14, color }}>{label}</div>
+                      <div style={{ fontSize: 11, color: '#aaa' }}>
+                        {item.createdAt}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: '#fff'
+                      }}
+                    >
+                      {sign} {item.amount.toFixed(2)} {item.currency}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
       </div>
     )
   }
@@ -1056,19 +1379,16 @@ function DiceApp() {
 
     const gameFinished = lobbyForGame.status === 'finished'
     const selectedGameResult = lobbyForGame.gameResult
-
-    // server-driven countdown
-    let countdownSeconds: number | null = null
-    if (
-      lobbyForGame.status === 'countdown' &&
-      typeof lobbyForGame.autoStartAt === 'number'
-    ) {
-      countdownSeconds = Math.max(
-        0,
-        Math.ceil((lobbyForGame.autoStartAt - Date.now()) / 1000)
-      )
-    }
-
+let countdownSeconds: number | null = null
+if (
+  lobbyForGame.status === 'countdown' &&
+  typeof lobbyForGame.autoStartAt === 'number'
+) {
+  countdownSeconds = Math.max(
+    0,
+    Math.ceil((lobbyForGame.autoStartAt - Date.now()) / 1000)
+  )
+}
     const gameLobbyTitle = (lobbyForGame.lobbyName || '').trim()
     const gameLabel = gameLobbyTitle
       ? `Lobby: ${gameLobbyTitle}`
@@ -1083,7 +1403,7 @@ function DiceApp() {
           paddingBottom: 40
         }}
       >
-        {/* Lobby header */}
+        {/* Lobby title + id */}
         <div
           style={{
             display: 'flex',
@@ -1143,9 +1463,31 @@ function DiceApp() {
           ].join(', ')}
         </p>
 
+        {/* Row with avatars vs */}
         {renderLobbyVsRow(lobbyForGame)}
 
-        {/* join / leave / cancel */}
+        {/* private lobby PIN input */}
+        {lobbyForGame.isPrivate && (
+          <div style={{ marginTop: 10 }}>
+            <span style={{ fontSize: 14 }}>PIN: </span>
+            <input
+              type='password'
+              value={joinPin}
+              maxLength={4}
+              onChange={e => setJoinPin(e.target.value.replace(/\D/g, ''))}
+              style={{
+                padding: '4px 8px',
+                borderRadius: 6,
+                border: '1px solid #555',
+                background: '#050511',
+                color: '#fff',
+                width: 80
+              }}
+            />
+          </div>
+        )}
+
+        {/* join / leave / cancel buttons */}
         {!gameFinished && (
           <div
             style={{
@@ -1157,6 +1499,7 @@ function DiceApp() {
           >
             {!isMeCreator && (
               <button
+                disabled={visibleCountdown !== null}
                 onClick={() =>
                   isMeInLobby
                     ? leaveLobby(lobbyForGame.id)
@@ -1187,6 +1530,7 @@ function DiceApp() {
 
             {isMeCreator && (
               <button
+                disabled={visibleCountdown !== null}
                 onClick={() => cancelLobby(lobbyForGame.id)}
                 style={{
                   padding: '8px 16px',
@@ -1209,56 +1553,69 @@ function DiceApp() {
           </div>
         )}
 
-        {countdownSeconds !== null &&
-          lobbyForGame.status === 'countdown' &&
-          isMyLobby && (
+
+        {/* phase 2: visible 3-2-1 before rolls */}
+        {visibleCountdown !== null &&
+          lobbyForGame.status !== 'finished' &&
+          myLobbyId === lobbyForGame.id && (
             <p
               style={{
-                fontSize: 18,
-                fontWeight: 700,
-                marginTop: 10,
-                textAlign: 'center',
-                color: '#facc15'
+                fontSize: 28,
+                fontWeight: 800,
+                marginTop: 12,
+                textAlign: 'center'
               }}
             >
-              Game starts in {countdownSeconds}s
+              {visibleCountdown > 0 ? visibleCountdown : ''}
             </p>
           )}
+{/* server-driven countdown */}
+{countdownSeconds !== null && lobbyForGame.status === 'countdown' && (
+  <p
+    style={{
+      fontSize: 18,
+      fontWeight: 700,
+      marginTop: 10,
+      textAlign: 'center',
+      color: '#facc15'
+    }}
+  >
+    Game starts in {countdownSeconds}s
+  </p>
+)}
 
-        {lobbyForGame.status === 'rolling' && (
-          <p
-            style={{
-              fontSize: 16,
-              fontWeight: 600,
-              marginTop: 10,
-              textAlign: 'center',
-              color: '#a5b4fc'
-            }}
-          >
-            Rolling the dice…
-          </p>
-        )}
+{lobbyForGame.status === 'rolling' && (
+  <p
+    style={{
+      fontSize: 16,
+      fontWeight: 600,
+      marginTop: 10,
+      textAlign: 'center',
+      color: '#a5b4fc'
+    }}
+  >
+    Rolling the dice…
+  </p>
+)}
 
+        {/* game result / rolling block */}
         {selectedGameResult && (
-          <div style={{ marginTop: 14 }}>
-            <h4>Game Result:</h4>
-            <p>
-              Winner: {selectedGameResult.winnerName} (roll{' '}
-              {selectedGameResult.highest})
-            </p>
+  <div style={{ marginTop: 14 }}>
+    <h4>Game Result:</h4>
+    <p>
+      Winner: {selectedGameResult.winnerName} (roll{' '}
+      {selectedGameResult.highest})
+    </p>
 
-            <ul>
-              {selectedGameResult.players.map(player => (
-                <li key={player.id}>
-                  {player.name}: rolled {normalizeRoll(player.roll)}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    )
-  }
+    <ul>
+      {selectedGameResult.players.map(player => (
+        <li key={player.id}>
+          {player.name}: rolled {normalizeRoll(player.roll)}
+        </li>
+      ))}
+    </ul>
+  </div>
+)}
 
   // ---- FILTERS for lobbies ----
   const isSearchEmpty =
@@ -1314,7 +1671,232 @@ function DiceApp() {
   // ---- lobbies page ----
   const renderLobbiesPage = () => (
     <>
-      {/* ... keep your existing lobbies UI here ... */}
+      <div
+        style={{
+          margin: '10px 0 14px',
+          padding: 10,
+          background: 'rgba(0,20,60,0.85)',
+          borderRadius: 12,
+          border: '1px solid rgba(0,120,255,0.2)',
+          boxShadow: '0 0 18px rgba(0,80,255,0.25)'
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 10,
+            marginBottom: 4
+          }}
+        >
+          <button
+            onClick={() => setIsSearchModalOpen(true)}
+            style={{
+              flex: 1,
+              padding: '9px 0',
+              background:
+                'linear-gradient(135deg, #4bbaff 0%, #5bc9ff 50%, #84d8ff 100%)',
+              color: '#000',
+              border: 'none',
+              borderRadius: 999,
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: 14,
+              boxShadow: '0 0 12px rgba(80,180,255,0.7)'
+            }}
+          >
+            🔎 Search
+          </button>
+
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            style={{
+              flex: 1,
+              padding: '9px 0',
+              background:
+                'linear-gradient(135deg, #ff0080 0%, #ff8c00 50%, #ffe53b 100%)',
+              color: '#111',
+              border: 'none',
+              borderRadius: 999,
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: 14,
+              boxShadow: '0 0 14px rgba(255,0,128,0.8)'
+            }}
+          >
+            ➕ Create
+          </button>
+        </div>
+
+        <div
+          style={{
+            marginTop: 4,
+            fontSize: 12,
+            color: '#e5e7eb',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}
+        >
+          <span>{lobbiesCountToShow} lobbies</span>
+          <button
+            onClick={loadLobbies}
+            style={{
+              fontSize: 11,
+              padding: '3px 8px',
+              borderRadius: 999,
+              border: '1px solid rgba(255,255,255,0.25)',
+              background: 'rgba(255,255,255,0.03)',
+              color: '#fff',
+              cursor: 'pointer'
+            }}
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <h2 style={{ marginTop: 4, marginBottom: 8 }}>Lobbies:</h2>
+
+      {visibleLobbies.length === 0 && <p>No lobbies match your search</p>}
+
+      {visibleLobbies.map(lobby => {
+        const title = (lobby.lobbyName || '').trim()
+        const label = title ? `Lobby: ${title}` : `Lobby: #${lobby.id}`
+
+        return (
+          <div
+            key={lobby.id}
+            style={{
+              padding: 12,
+              marginBottom: 10,
+              background:
+                'linear-gradient(135deg, rgba(0,30,80,0.9), rgba(0,15,40,0.95))',
+              borderRadius: 10,
+              border: '1px solid rgba(0,120,255,0.25)',
+              boxShadow: '0 0 14px rgba(0,80,255,0.4)'
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 4,
+                gap: 8
+              }}
+            >
+              <div>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 15,
+                    fontWeight: 700
+                  }}
+                >
+                  {label}{' '}
+                  {lobby.isPrivate && (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        background:
+                          'linear-gradient(135deg, #ff4d6a 0%, #ff9a9e 100%)',
+                        padding: '2px 8px',
+                        borderRadius: 999,
+                        marginLeft: 6,
+                        color: '#111',
+                        fontWeight: 600
+                      }}
+                    >
+                      Private
+                    </span>
+                  )}
+                </h3>
+              </div>
+              <span
+                style={{
+                  fontSize: 11,
+                  opacity: 0.9,
+                  padding: '2px 6px',
+                  borderRadius: 999,
+                  border: '1px solid rgba(255,255,255,0.25)'
+                }}
+              >
+                #{lobby.id}
+              </span>
+            </div>
+
+            <p style={{ fontSize: 13, color: '#ccc' }}>Status: {lobby.status}</p>
+            <p style={{ fontSize: 13, color: '#ccc' }}>
+              Creator: {lobby.creatorName || 'not set yet (no players)'}
+            </p>
+            <p style={{ fontSize: 13, color: '#ccc' }}>
+              Players: {lobby.players.length}
+              {lobby.maxPlayers ? ` / ${lobby.maxPlayers}` : ''}
+            </p>
+            <p style={{ fontSize: 13, color: '#ccc' }}>
+              Bet: {(lobby.betAmount ?? 1).toFixed(2)} TON
+            </p>
+
+            {renderLobbyVsRow(lobby)}
+
+            {lobby.status === 'finished' && lobby.gameResult && (
+              <div style={{ marginTop: 6, fontSize: 12 }}>
+                <div style={{ color: '#bbf7d0' }}>
+                  Winner:{' '}
+                  <span style={{ fontWeight: 700 }}>
+                    {lobby.gameResult.winnerName}
+                  </span>{' '}
+                  (roll {lobby.gameResult.highest})
+                </div>
+
+                {currentUser &&
+                  (() => {
+                    const me = lobby.gameResult!.players.find(
+                      p => p.id === currentUser.id
+                    )
+                    if (!me) return null
+                    const didWin =
+                      lobby.gameResult!.winnerId === currentUser.id
+                    return (
+                      <div
+                        style={{
+                          marginTop: 2,
+                          color: didWin ? '#22c55e' : '#f97316'
+                        }}
+                      >
+                        You {didWin ? 'won' : 'lost'} with roll{' '}
+                        {normalizeRoll(me.roll)}
+                      </div>
+                    )
+                  })()}
+              </div>
+            )}
+
+            <button
+              onClick={() => {
+                setSelectedLobbyId(lobby.id)
+                setCurrentPage('game')
+              }}
+              style={{
+                padding: '7px 16px',
+                background:
+                  'linear-gradient(135deg, #00d4ff 0%, #0074ff 60%, #4a00e0 100%)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 999,
+                cursor: 'pointer',
+                marginTop: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                boxShadow: '0 0 12px rgba(0,116,255,0.8)'
+              }}
+            >
+              {lobby.status === 'finished' ? 'View result' : 'Open Lobby'}
+            </button>
+          </div>
+        )
+      })}
     </>
   )
 
@@ -1352,7 +1934,7 @@ function DiceApp() {
     return max
   }, null)
 
-    // ---- main frame ----
+  // ---- main frame ----
   return (
     <div
       style={{
@@ -1368,7 +1950,6 @@ function DiceApp() {
         position: 'relative'
       }}
     >
-      {/* HEADER */}
       <div
         style={{
           display: 'flex',
@@ -1390,7 +1971,6 @@ function DiceApp() {
         </div>
       </div>
 
-      {/* GLOBAL WINS BANNER */}
       {(lastGlobalWin || biggestGlobalWin) && (
         <div
           style={{
@@ -1441,12 +2021,11 @@ function DiceApp() {
         </div>
       )}
 
-      {/* MAIN PAGES */}
       {currentPage === 'lobbies' && renderLobbiesPage()}
       {currentPage === 'profile' && renderProfilePage()}
       {currentPage === 'game' && renderGamePage()}
 
-      {/* ================== CREATE LOBBY POPUP ================== */}
+      {/* CREATE LOBBY POPUP */}
       {isCreateModalOpen && (
         <div
           onClick={() => setIsCreateModalOpen(false)}
@@ -1628,7 +2207,7 @@ function DiceApp() {
         </div>
       )}
 
-      {/* ================== SEARCH POPUP ================== */}
+      {/* SEARCH POPUP */}
       {isSearchModalOpen && (
         <div
           onClick={() => setIsSearchModalOpen(false)}
@@ -1780,7 +2359,7 @@ function DiceApp() {
         </div>
       )}
 
-      {/* ================== BOTTOM NAVIGATION ================== */}
+      {/* bottom nav */}
       <div
         style={{
           position: 'fixed',
@@ -1886,7 +2465,6 @@ function DiceApp() {
         </div>
       </div>
 
-      {/* ================== ERROR POPUP ================== */}
       {errorMessage && (
         <div
           onClick={() => setErrorMessage(null)}
