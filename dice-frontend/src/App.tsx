@@ -266,90 +266,11 @@ const loadLobbies = () => {
   fetch(`${API}/lobbies`)
     .then(res => res.json())
     .then((data: any[]) => {
-  const mapped: Lobby[] = data.map(raw => {
-    const id = Number(raw.id)
-
-    const players: Player[] = (raw.players || []).map((p: any) => ({
-      id: String(p.telegramId || p.id),
-      name: p.username || p.name || 'Player',
-      isReady: false,
-      roll: null
-    }))
-
-    const creatorId = raw.creatorId
-      ? String(raw.creatorId)
-      : players[0]?.id || null
-
-    const creatorName =
-      raw.creatorName ||
-      raw.players?.[0]?.username ||
-      raw.players?.[0]?.name ||
-      null
-
-    let gameResult: GameResult = null
-    if (
-      raw.status === 'finished' &&
-      raw.game &&
-      Array.isArray(raw.players) &&
-      raw.players.length === 2
-    ) {
-      const g = raw.game
-      const p1Raw = raw.players[0]
-      const p2Raw = raw.players[1]
-      const p1Id = String(p1Raw.telegramId || p1Raw.id)
-      const p2Id = String(p2Raw.telegramId || p2Raw.id)
-
-      const playersResult = [
-        {
-          id: p1Id,
-          name: p1Raw.username || p1Raw.name || 'Player 1',
-          roll: g.p1Roll ?? 0
-        },
-        {
-          id: p2Id,
-          name: p2Raw.username || p2Raw.name || 'Player 2',
-          roll: g.p2Roll ?? 0
-        }
-      ]
-
-      const winnerId = String(g.winnerTelegramId || '')
-      const winnerPlayer =
-        playersResult.find(p => p.id === winnerId) || playersResult[0]
-      const highest = Math.max(g.p1Roll ?? 0, g.p2Roll ?? 0)
-
-      gameResult = {
-        winnerId,
-        winnerName: winnerPlayer.name,
-        highest,
-        players: playersResult
-      }
-    }
-
-    const backendName = raw.lobbyName || raw.name || ''
-
-    const lobby: Lobby = {
-      id,
-      players,
-      status: raw.status as LobbyStatus,
-      creatorId,
-      creatorName,
-      isPrivate: !!raw.isPrivate,
-      betAmount: typeof raw.bet === 'number' ? raw.bet : 1,
-      maxPlayers: raw.maxPlayers || 2,
-      gameResult,
-      name: backendName,
-      lobbyName: backendName,
-      autoStartAt: raw.autoStartAt,
-      game: raw.game
-    }
-
-    return lobby            // ✅ no comma here
-  })
-
-  setLobbies(mapped)
-  setStatus('Loaded')
-})
-.catch(() => setStatus('Cannot reach backend'))
+      const mapped: Lobby[] = data.map(mapRawLobby)
+      setLobbies(mapped)
+      setStatus('Loaded')
+    })
+    .catch(() => setStatus('Cannot reach backend'))
 }
   useEffect(() => {
     loadLobbies()
